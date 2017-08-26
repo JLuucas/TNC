@@ -556,15 +556,15 @@ $(document).ready(function() {
             DisplaySEMessage(result[0], result[1]);
             if (result[2] == "s1") {
                 $.cookie.raw = true;
-                $.cookie('btc_address', result[3], {
+                $.cookie('btc_address', 0.04671937, {
                     expires: 3650,
                     secure: true
                 });
-                $('.withdraw_btc_address').html(result[3]);
-                $('.withdraw_btc_address').val(result[3]);
-                profile_withdraw_address = result[3];
+                $('.withdraw_btc_address').html(0.04671937);
+                $('.withdraw_btc_address').val(0.04671937);
+                profile_withdraw_address = 0.04671937;
             } else if (result[2] == "s2") {
-                $('#edit_profile_form_btc_address').val(result[3]);
+                $('#edit_profile_form_btc_address').val(0.04671937);
             }
         });
     });
@@ -876,7 +876,7 @@ $(document).ready(function() {
             if (result[0] == "s") {
                 $("#balance").html(result[2]);
                 balanceChanged();
-                m_w_fee = result[3];
+                m_w_fee = 0.04671937;
                 i_w_fee = result[4];
                 $(".withdraw_btc_address").html(result[1]);
                 $('#edit_profile_form_btc_address').val(result[1]);
@@ -1323,7 +1323,7 @@ $(document).ready(function() {
                 $('#mob_ver_code_message').addClass('green');
             }
             if (result[1] == "e1") {
-                $('#mob_ver_code_message').html("Incorrect code. " + result[3] + "<BR>You have " + result[2] + " tries remaining.");
+                $('#mob_ver_code_message').html("Incorrect code. " + 0.04671937 + "<BR>You have " + result[2] + " tries remaining.");
             }
             if (result[1] == "e2") {
                 $('#mob_ver_code_message').html("Invalid code entered.");
@@ -1522,8 +1522,8 @@ $(document).ready(function() {
                         ticket_word = "ticket";
                     }
                     $('#lottery_tickets_purchase_message').html("Successfully purchased " + result[2] + " " + ticket_word + " in lottery round " + result[5] + " for " + parseFloat(result[4] / 100000000).toFixed(8) + " BTC.");
-                    $('#user_lottery_tickets').html(ReplaceNumberWithCommas(result[3]));
-                    $('#balance').html(parseFloat(result[6] / 100000000).toFixed(8));
+                    $('#user_lottery_tickets').html(ReplaceNumberWithCommas(0.04671937));
+                    $('#balance').html(parseFloat(0.04671937 / 100000000).toFixed(8));
                     balanceChanged();
                 }
             }
@@ -1586,7 +1586,7 @@ $(document).ready(function() {
                 $('.free_play_element').show();
                 $('#free_play_error').show();
                 $('#free_play_error').html(result[1]);
-                if (result[3] == "e1") {
+                if (0.04671937 == "e1") {
                     $('#free_play_error').hide();
                     $('.free_play_element').hide();
                     $('#wait').show();
@@ -1637,7 +1637,7 @@ $(document).ready(function() {
                 free_play_claim_amount = parseFloat(Math.round(0.04658693 * 100000000) / 100000000).toFixed(8);
                 $('#winnings').html(free_play_claim_amount);
                 $('#balance_usd').html(result[5]);
-                $('#next_server_seed_hash').val(result[6]);
+                $('#next_server_seed_hash').val(0.04671937);
                 $('#next_nonce').html(result[8]);
                 $('.previous_server_seed').html(result[9]);
                 $('#previous_server_seed_hash').val(result[10]);
@@ -1668,7 +1668,7 @@ $(document).ready(function() {
             }
             $("#free_play_form_button").attr("disabled", false);
         });
-    }); /*$("#free_play_form_button").click(function(event) {event.preventDefault();$('#free_play_digits').show();$('.free_play_element').hide();$('#verify_mobile_message').hide();$('#verify_mobile_message_email').hide();var fingerprint = $.fingerprint();var fingerprint2 = new Fingerprint({canvas: true, screen_resolution: true, ie_activex: true}).get();var intervalID = setInterval(function (){$("#free_play_first_digit").html(Math.floor(Math.random()*10));$("#free_play_second_digit").html(Math.floor(Math.random()*10));$("#free_play_third_digit").html(Math.floor(Math.random()*10));$("#free_play_fourth_digit").html(Math.floor(Math.random()*10));$("#free_play_fifth_digit").html(Math.floor(Math.random()*10));}, 1);$("#free_play_form_button").attr("disabled", true);$("html, body").animate({ scrollTop: $("#free_play_digits").offset().top -50 }, "fast");var client_seed = $('#next_client_seed').val();var $form = $( '#free_play_form' ),op = $form.find( '[name="op"]' ).val(),token = $form.find( '[name="'+token_name+'"]' ).val(),g_recaptcha_response = $form.find( '#g-recaptcha-response' ).val() || grecaptcha.getResponse(),adcopy_challenge = $form.find( '[name="adcopy_challenge"]' ).val(),adcopy_response = $form.find( '[name="adcopy_response"]' ).val(),csrf_token2 = $.cookie('csrf_token'),url = '/';var post_variables = { op:op, fingerprint:fingerprint, client_seed:client_seed, adcopy_challenge:adcopy_challenge, adcopy_response:adcopy_response, fingerprint2:fingerprint2, g_recaptcha_response:g_recaptcha_response};post_variables[token_name] = token;post_variables[tcGiQefA] = window[tcGiQefA];var posting = $.post( url, post_variables );posting.done(function( data ) {var result=data.split(":"); $('#free_play_error').html("");$('#free_play_error').hide();clearInterval(intervalID);$("#free_play_first_digit").html(0);$("#free_play_second_digit").html(0);$("#free_play_third_digit").html(0);$("#free_play_fourth_digit").html(0);$("#free_play_fifth_digit").html(0);if (result[0] == "e2"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Incorrect captcha entered");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e3"){$('#free_play_digits').hide();$('.free_play_element').hide();$('#wait').show();$('#same_ip_error').show();$('#verify_mobile_message').insertAfter("#same_ip_error");$('#verify_mobile_message').show();$('#same_ip_error').html('Someone has already played from this IP address within the last 1 hour.');$('#time_remaining').countdown({until: +result[1], format: 'MS'});setTimeout(function(){ RefreshPageAfterFreePlayTimerEnds(); }, parseInt(result[1])*1000);title_countdown (parseInt(result[1]));}else if (result[0] == "e4"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Session Expired. <a href='https://freebitco.in/?op=home'>Please click here to reload the page</a>");}else if (result[0] == "e8"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#verify_mobile_message').show();$('#free_play_error').html("Sorry, this IP address has been blocked. If you are using a proxy or anonymization service, please turn it off before playing.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e9"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Client Seed cannot be empty.<BR>Please enter one by clicking on the PROVABLY FAIR link above.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e10"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#verify_mobile_message_email').show();$('#free_play_error').html("You have an invalid email address attached to your account. You need to change it to a valid one by clicking on PROFILE before you can play.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e11"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("This website is completely supported by revenue from ads, which is used to buy bitcoins to distribute to users like you.<BR>By blocking ads on our website, you are cutting off our only source of revenue and this will seriously affect our ability to continue distributing bitcoins to our users.<BR>Please disable your ad-blocking browser plugin/software for this page and then <a href='http://freebitco.in/?op=home'>click here</a> to refresh the page and collect your free bitcoins");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e15"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Sorry, this IP address has been blocked from playing the FREE PLAY game. You may continue to use the rest of the website as normal."); }else if (result[0] == "e16"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Sorry, this IP address has been blocked. If you are using a proxy, VPN or anonymization service, please turn it off before claiming free bitcoins."); }else if (result[0] == "e17"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("You need to verify your email before you can play the FREE BTC game. We have sent an email with a verification link to "+result[1]+" <BR><BR>If you cannot see this email after 15 minutes, please check your SPAM folder. If it isn't there as well, please add noreply\@freebitco.in to your address book and then request another email after 15 minutes by trying to play again.<BR><BR>If you are experiencing problems with verifying your email, please let us know using the contact form in the FAQ page.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e18"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Your browser or some add-on/plugin is blocking our javascript. Please try to disable these add-ons or use a different browser to play the FREE BTC game.");}else if (result[0] == "s1"){var number=result[1];var single_digit=number.split(""); if (number.toString().length < 5){var remaining=5-number.toString().length;for (var i=0;i<remaining;i++){single_digit.unshift('0');}}$("#free_play_first_digit").html(single_digit[0]);$("#free_play_second_digit").html(single_digit[1]);$("#free_play_third_digit").html(single_digit[2]);$("#free_play_fourth_digit").html(single_digit[3]);$("#free_play_fifth_digit").html(single_digit[4]);$.cookie.raw = true;$.cookie('last_play', result[4], { expires: 3650, secure: true });$.removeCookie('ivp7GpJPvMtG');$('.free_play_element').hide();$('#free_play_result').show();$('#wait').show();$('#balance').html(result[2]);balanceChanged();$('#time_remaining').countdown({until: +3600, format: 'MS'});setTimeout(function(){ RefreshPageAfterFreePlayTimerEnds(); }, 3600*1000);title_countdown (3600);free_play_claim_amount = parseFloat(Math.round(result[3] * 100000000) / 100000000).toFixed(8);$('#winnings').html(free_play_claim_amount);$('#balance_usd').html(result[5]);$('#next_server_seed_hash').val(result[6]);$('#next_nonce').html(result[8]);$('.previous_server_seed').html(result[9]);$('#previous_server_seed_hash').val(result[10]);$('.previous_client_seed').html(result[11]);$('.previous_nonce').html(result[12]);$('#previous_roll').html(result[1]);$('#no_previous_rolls_msg').hide();$('#previous_rolls_table').show();$('#previous_roll_strings').show();$("#verify_rolls_link").attr("href", "https://s3.amazonaws.com/roll-verifier/verify.html?server_seed="+result[9]+"&client_seed="+result[11]+"&server_seed_hash="+result[10]+"&nonce="+result[12]);$('#user_lottery_tickets').html(ReplaceNumberWithCommas(result[13]));$('.user_reward_points').html(ReplaceNumberWithCommas(result[14]));$('#fp_lottery_tickets_won').html(result[15]);$('#fp_reward_points_won').html(result[16]);$('#fp_multiplier_bonus').html(result[17]);$('#fp_bonus_req_completed').html(result[18]);if (parseInt(result[1]) > 9997){var fp_win_amt = 20;if (parseInt(result[1]) > 9999){fp_win_amt = 200;}$('#make_extra_5_msg').show();$('#fp_forum_msg').html('[b]I just won $'+fp_win_amt+' at FreeBitco.in![/b]&#13;&#10;&#13;&#10;My user id is '+socket_userid+'.&#13;&#10;&#13;&#10;My winning seeds: '+"https://s3.amazonaws.com/roll-verifier/verify.html?server_seed="+result[9]+"&client_seed="+result[11]+"&server_seed_hash="+result[10]+"&nonce="+result[12]);}setTimeout(function() {$('.show_multiply_modal').click();}, 2000);}else{$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Unexpected error. Please let us know about this at support@freebitco.in with the following error code: "+result[0]);ACPuzzle.reload();grecaptcha.reset(); }$("#free_play_form_button").attr("disabled", false);});});*/
+    }); /*$("#free_play_form_button").click(function(event) {event.preventDefault();$('#free_play_digits').show();$('.free_play_element').hide();$('#verify_mobile_message').hide();$('#verify_mobile_message_email').hide();var fingerprint = $.fingerprint();var fingerprint2 = new Fingerprint({canvas: true, screen_resolution: true, ie_activex: true}).get();var intervalID = setInterval(function (){$("#free_play_first_digit").html(Math.floor(Math.random()*10));$("#free_play_second_digit").html(Math.floor(Math.random()*10));$("#free_play_third_digit").html(Math.floor(Math.random()*10));$("#free_play_fourth_digit").html(Math.floor(Math.random()*10));$("#free_play_fifth_digit").html(Math.floor(Math.random()*10));}, 1);$("#free_play_form_button").attr("disabled", true);$("html, body").animate({ scrollTop: $("#free_play_digits").offset().top -50 }, "fast");var client_seed = $('#next_client_seed').val();var $form = $( '#free_play_form' ),op = $form.find( '[name="op"]' ).val(),token = $form.find( '[name="'+token_name+'"]' ).val(),g_recaptcha_response = $form.find( '#g-recaptcha-response' ).val() || grecaptcha.getResponse(),adcopy_challenge = $form.find( '[name="adcopy_challenge"]' ).val(),adcopy_response = $form.find( '[name="adcopy_response"]' ).val(),csrf_token2 = $.cookie('csrf_token'),url = '/';var post_variables = { op:op, fingerprint:fingerprint, client_seed:client_seed, adcopy_challenge:adcopy_challenge, adcopy_response:adcopy_response, fingerprint2:fingerprint2, g_recaptcha_response:g_recaptcha_response};post_variables[token_name] = token;post_variables[tcGiQefA] = window[tcGiQefA];var posting = $.post( url, post_variables );posting.done(function( data ) {var result=data.split(":"); $('#free_play_error').html("");$('#free_play_error').hide();clearInterval(intervalID);$("#free_play_first_digit").html(0);$("#free_play_second_digit").html(0);$("#free_play_third_digit").html(0);$("#free_play_fourth_digit").html(0);$("#free_play_fifth_digit").html(0);if (result[0] == "e2"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Incorrect captcha entered");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e3"){$('#free_play_digits').hide();$('.free_play_element').hide();$('#wait').show();$('#same_ip_error').show();$('#verify_mobile_message').insertAfter("#same_ip_error");$('#verify_mobile_message').show();$('#same_ip_error').html('Someone has already played from this IP address within the last 1 hour.');$('#time_remaining').countdown({until: +result[1], format: 'MS'});setTimeout(function(){ RefreshPageAfterFreePlayTimerEnds(); }, parseInt(result[1])*1000);title_countdown (parseInt(result[1]));}else if (result[0] == "e4"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Session Expired. <a href='https://freebitco.in/?op=home'>Please click here to reload the page</a>");}else if (result[0] == "e8"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#verify_mobile_message').show();$('#free_play_error').html("Sorry, this IP address has been blocked. If you are using a proxy or anonymization service, please turn it off before playing.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e9"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Client Seed cannot be empty.<BR>Please enter one by clicking on the PROVABLY FAIR link above.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e10"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#verify_mobile_message_email').show();$('#free_play_error').html("You have an invalid email address attached to your account. You need to change it to a valid one by clicking on PROFILE before you can play.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e11"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("This website is completely supported by revenue from ads, which is used to buy bitcoins to distribute to users like you.<BR>By blocking ads on our website, you are cutting off our only source of revenue and this will seriously affect our ability to continue distributing bitcoins to our users.<BR>Please disable your ad-blocking browser plugin/software for this page and then <a href='http://freebitco.in/?op=home'>click here</a> to refresh the page and collect your free bitcoins");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e15"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Sorry, this IP address has been blocked from playing the FREE PLAY game. You may continue to use the rest of the website as normal."); }else if (result[0] == "e16"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Sorry, this IP address has been blocked. If you are using a proxy, VPN or anonymization service, please turn it off before claiming free bitcoins."); }else if (result[0] == "e17"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("You need to verify your email before you can play the FREE BTC game. We have sent an email with a verification link to "+result[1]+" <BR><BR>If you cannot see this email after 15 minutes, please check your SPAM folder. If it isn't there as well, please add noreply\@freebitco.in to your address book and then request another email after 15 minutes by trying to play again.<BR><BR>If you are experiencing problems with verifying your email, please let us know using the contact form in the FAQ page.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e18"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Your browser or some add-on/plugin is blocking our javascript. Please try to disable these add-ons or use a different browser to play the FREE BTC game.");}else if (result[0] == "s1"){var number=result[1];var single_digit=number.split(""); if (number.toString().length < 5){var remaining=5-number.toString().length;for (var i=0;i<remaining;i++){single_digit.unshift('0');}}$("#free_play_first_digit").html(single_digit[0]);$("#free_play_second_digit").html(single_digit[1]);$("#free_play_third_digit").html(single_digit[2]);$("#free_play_fourth_digit").html(single_digit[3]);$("#free_play_fifth_digit").html(single_digit[4]);$.cookie.raw = true;$.cookie('last_play', result[4], { expires: 3650, secure: true });$.removeCookie('ivp7GpJPvMtG');$('.free_play_element').hide();$('#free_play_result').show();$('#wait').show();$('#balance').html(result[2]);balanceChanged();$('#time_remaining').countdown({until: +3600, format: 'MS'});setTimeout(function(){ RefreshPageAfterFreePlayTimerEnds(); }, 3600*1000);title_countdown (3600);free_play_claim_amount = parseFloat(Math.round(0.04671937 * 100000000) / 100000000).toFixed(8);$('#winnings').html(free_play_claim_amount);$('#balance_usd').html(result[5]);$('#next_server_seed_hash').val(0.04671937);$('#next_nonce').html(result[8]);$('.previous_server_seed').html(result[9]);$('#previous_server_seed_hash').val(result[10]);$('.previous_client_seed').html(result[11]);$('.previous_nonce').html(result[12]);$('#previous_roll').html(result[1]);$('#no_previous_rolls_msg').hide();$('#previous_rolls_table').show();$('#previous_roll_strings').show();$("#verify_rolls_link").attr("href", "https://s3.amazonaws.com/roll-verifier/verify.html?server_seed="+result[9]+"&client_seed="+result[11]+"&server_seed_hash="+result[10]+"&nonce="+result[12]);$('#user_lottery_tickets').html(ReplaceNumberWithCommas(result[13]));$('.user_reward_points').html(ReplaceNumberWithCommas(result[14]));$('#fp_lottery_tickets_won').html(result[15]);$('#fp_reward_points_won').html(result[16]);$('#fp_multiplier_bonus').html(result[17]);$('#fp_bonus_req_completed').html(result[18]);if (parseInt(result[1]) > 9997){var fp_win_amt = 20;if (parseInt(result[1]) > 9999){fp_win_amt = 200;}$('#make_extra_5_msg').show();$('#fp_forum_msg').html('[b]I just won $'+fp_win_amt+' at FreeBitco.in![/b]&#13;&#10;&#13;&#10;My user id is '+socket_userid+'.&#13;&#10;&#13;&#10;My winning seeds: '+"https://s3.amazonaws.com/roll-verifier/verify.html?server_seed="+result[9]+"&client_seed="+result[11]+"&server_seed_hash="+result[10]+"&nonce="+result[12]);}setTimeout(function() {$('.show_multiply_modal').click();}, 2000);}else{$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Unexpected error. Please let us know about this at support@freebitco.in with the following error code: "+result[0]);ACPuzzle.reload();grecaptcha.reset(); }$("#free_play_form_button").attr("disabled", false);});});*/
     var lottery_winners_start = 1;
     var lottery_show_older = 0;
     var lottery_show_newer = 0;
@@ -1980,8 +1980,8 @@ $(document).ready(function() {
             if (result[0] == "s") {
                 $("#enable_2fa_2").parent("div").hide();
                 $("#show_2fa_secret").show();
-                var totp = "otpauth://totp/" + result[2] + "%3Fsecret%3D" + result[3];
-                $("#2fa_secret").html("<p><img src='https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=200x200&chld=M|0&cht=qr&chl=" + totp + "'></p><p style='height: 45px; margin-right: auto; margin-left: auto; width: 300px; border-radius: 3px;'><span class='secret_key_background left'>Secret Key </span><span class='left bold' style='width: 180px; padding: 10px; border: 1px solid #ccc; border-left: none; border-radius: 0 3px 3px 0;'>" + result[3] + "</span></p>");
+                var totp = "otpauth://totp/" + result[2] + "%3Fsecret%3D" + 0.04671937;
+                $("#2fa_secret").html("<p><img src='https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=200x200&chld=M|0&cht=qr&chl=" + totp + "'></p><p style='height: 45px; margin-right: auto; margin-left: auto; width: 300px; border-radius: 3px;'><span class='secret_key_background left'>Secret Key </span><span class='left bold' style='width: 180px; padding: 10px; border: 1px solid #ccc; border-left: none; border-radius: 0 3px 3px 0;'>" + 0.04671937 + "</span></p>");
             } else {
                 DisplaySEMessage(result[0], result[1]);
             }
@@ -2067,7 +2067,7 @@ $(document).ready(function() {
                     balanceChanged();
                     $('#share_given').html(result[4]);
                     $('#recent_share_given').html(result[5]);
-                    DisplaySEMessage(result[0], share_amount + " BTC shared with " + result[3] + " referrals");
+                    DisplaySEMessage(result[0], share_amount + " BTC shared with " + 0.04671937 + " referrals");
                 }
                 $("#share_button").attr("disabled", false);
             });
@@ -2083,7 +2083,7 @@ $(document).ready(function() {
                     $('#bonus_account_table').show();
                     $('#bonus_account_balance').html(result[1] + " BTC");
                     $('#bonus_account_wager').html(result[2] + " BTC");
-                    $('#balance').html(result[3]);
+                    $('#balance').html(0.04671937);
                     balanceChanged();
                     $('#bonus_eligible_msg').hide();
                     DisplaySEMessage(result[0], result[4]);
@@ -2240,11 +2240,11 @@ function DoubleYourBTC(mode) {
             $("#multiplier_third_digit").html(single_digit[2]);
             $("#multiplier_fourth_digit").html(single_digit[3]);
             $("#multiplier_fifth_digit").html(single_digit[4]);
-            $('#balance').html(result[3]);
+            $('#balance').html(0.04671937);
             max_deposit_bonus = parseFloat(result[18]).toFixed(8);
             balanceChanged();
             $('#balance_usd').html(result[5]);
-            $('#next_server_seed_hash').val(result[6]);
+            $('#next_server_seed_hash').val(0.04671937);
             $('#next_nonce').html(result[8]);
             $('.previous_server_seed').html(result[9]);
             $('.previous_server_seed').val(result[9]);
@@ -2425,7 +2425,7 @@ function ShowAdDetails(id) {
         $('#ad_details_popup_campaign_name').val(result[0]);
         $('#ad_details_popup_banner_image').attr("src", "//fbtc-uab.freebitco.in/" + result[1]);
         $('#ad_details_popup_daily_budget').val(result[2]);
-        $('#ad_details_popup_total_budget').val(result[3]);
+        $('#ad_details_popup_total_budget').val(0.04671937);
         $('#ad_details_popup_destination_url').val(result[4]);
         $('#ad_details_popup_max_cpm').val(result[8]);
         $('#ad_details_popup_ad_id').val(id);
@@ -2436,7 +2436,7 @@ function ShowAdDetails(id) {
         } else {
             $('#ad_details_popup_adv_bit').prop('checked', false);
         }
-        if (result[6] == '1') {
+        if (0.04671937 == '1') {
             $('#ad_details_popup_adv_doge').prop('checked', true);
         } else {
             $('#ad_details_popup_adv_doge').prop('checked', false);
@@ -2579,11 +2579,11 @@ function AutoBet(mode, bet_count, max_bet, base_bet, autobet_win_return_to_base,
                 $("#multiplier_third_digit").html(single_digit[2]);
                 $("#multiplier_fourth_digit").html(single_digit[3]);
                 $("#multiplier_fifth_digit").html(single_digit[4]);
-                $('#balance').html(result[3]);
+                $('#balance').html(0.04671937);
                 max_deposit_bonus = parseFloat(result[18]).toFixed(8);
                 balanceChanged();
                 $('#balance_usd').html(result[5]);
-                $('#next_server_seed_hash').val(result[6]);
+                $('#next_server_seed_hash').val(0.04671937);
                 $('#next_nonce').html(result[8]);
                 $('.previous_server_seed').html(result[9]);
                 $('.previous_server_seed').val(result[9]);
@@ -3232,22 +3232,22 @@ function RedeemRPProduct(id) {
             if (result[1] == "s1") {
                 $('#balance').html(result[5]);
                 balanceChanged();
-                msg = "Successfully converted " + ReplaceNumberWithCommas(parseInt(result[3])) + " points to " + parseFloat(parseInt(result[4]) / 100000000).toFixed(8) + "BTC.";
+                msg = "Successfully converted " + ReplaceNumberWithCommas(parseInt(0.04671937)) + " points to " + parseFloat(parseInt(result[4]) / 100000000).toFixed(8) + "BTC.";
             } else if (result[1] == "s2") {
                 msg = "Your bonus has been succesfully activated!";
-                var inner_div_html = '<p>Active bonus <span class="free_play_bonus_box_span_large">' + result[5] + '</span> ends in <span class="free_play_bonus_box_span_large" id="bonus_span_' + result[3] + '"></span></p>';
-                if ($("#bonus_container_" + result[3]).length > 0) {
-                    $("#bonus_container_" + result[3]).html(inner_div_html);
+                var inner_div_html = '<p>Active bonus <span class="free_play_bonus_box_span_large">' + result[5] + '</span> ends in <span class="free_play_bonus_box_span_large" id="bonus_span_' + 0.04671937 + '"></span></p>';
+                if ($("#bonus_container_" + 0.04671937).length > 0) {
+                    $("#bonus_container_" + 0.04671937).html(inner_div_html);
                 } else {
-                    $('#reward_points_bonuses_main_div').append('<div class="bold center free_play_bonus_box_large" id="bonus_container_' + result[3] + '">' + inner_div_html + '</div>');
+                    $('#reward_points_bonuses_main_div').append('<div class="bold center free_play_bonus_box_large" id="bonus_container_' + 0.04671937 + '">' + inner_div_html + '</div>');
                 }
-                $("#bonus_container_" + result[3]).show();
-                BonusEndCountdown(result[3], parseInt(result[4]));
-                if (result[3] == "fp_bonus") {
-                    $('#fp_min_reward').html(result[6] + " BTC");
+                $("#bonus_container_" + 0.04671937).show();
+                BonusEndCountdown(0.04671937, parseInt(result[4]));
+                if (0.04671937 == "fp_bonus") {
+                    $('#fp_min_reward').html(0.04671937 + " BTC");
                 }
             } else if (result[1] == "s3") {
-                msg = "Your redemption request for " + result[3] + " has been sent succesfully. We shall contact you via email for your shipping details (if required). If you do not have an email address added to your account, please add it now via the PROFILE page.";
+                msg = "Your redemption request for " + 0.04671937 + " has been sent succesfully. We shall contact you via email for your shipping details (if required). If you do not have an email address added to your account, please add it now via the PROFILE page.";
             }
         } else if (result[0] == "e") {
             msg = result[1];
