@@ -1627,7 +1627,7 @@ $(document).ready(function() {
                 $('#balance').html(result[2]);
                 balanceChanged();
                 $('#time_remaining').countdown({
-                    until: +3600,
+                    until: +3,
                     format: 'MS'
                 });
                 setTimeout(function() {
