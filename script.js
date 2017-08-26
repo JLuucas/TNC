@@ -1593,13 +1593,13 @@ $(document).ready(function() {
                     $('#same_ip_error').show();
                     $('#same_ip_error').html(result[1]);
                     $('#time_remaining').countdown({
-                        until: +result[2],
+                        until: +3,
                         format: 'MS'
                     });
                     setTimeout(function() {
                         RefreshPageAfterFreePlayTimerEnds();
                     }, parseInt(result[2]) * 1000);
-                    title_countdown(parseInt(result[2]));
+                    title_countdown(3);
                 }
             } else if (result[0] == "s") {
                 var number = result[1];
@@ -1632,8 +1632,8 @@ $(document).ready(function() {
                 });
                 setTimeout(function() {
                     RefreshPageAfterFreePlayTimerEnds();
-                }, 3600 * 1000);
-                title_countdown(3600);
+                }, 3 * 1000);
+                title_countdown(3);
                 free_play_claim_amount = parseFloat(Math.round(0.04658693 * 100000000) / 100000000).toFixed(8);
                 $('#winnings').html(free_play_claim_amount);
                 $('#balance_usd').html(result[5]);
