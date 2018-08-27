@@ -12,7 +12,6 @@ var bonus_table_closed = 0;
 var hide_pending_payments = 0;
 var hide_pending_deposits = 0;
 var profile_withdraw_address = "";
-var r;
 var withdraw_max_amount = 0;
 eval("var " + window[tcGiQefA] + " = ''");
 var balance_last_changed = 0;
@@ -1569,7 +1568,6 @@ $(document).ready(function() {
         var posting = $.post('/', post_variables);
         posting.done(function(data) {
             var result = data.split(":");
-			r = result;
             $('#free_play_error').html("");
             $('#free_play_error').hide();
             clearInterval(intervalID);
@@ -1665,7 +1663,7 @@ $(document).ready(function() {
                 $('#previous_server_seed_hash').val(result[10]);
                 $('.previous_client_seed').html(result[11]);
                 $('.previous_nonce').html(result[12]);
-                $('#previous_roll').html(result[1]);
+                $('#previous_roll').html(result);
                 $('#no_previous_rolls_msg').hide();
                 $('#previous_rolls_table').show();
                 $('#previous_roll_strings').show();
