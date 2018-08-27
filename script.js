@@ -6,7 +6,7 @@ var detached_captcha;
 var autobet_history = [];
 var submissionEnabled = true;
 var bet_history_page = 0;
-var jackpot_costs = ["", "0.00000001", "0.00000001", "0.00000001", "0.00000001", "0.00000001"];
+var jackpot_costs = ["", "0.00000002", "0.00000013", "0.00000125", "0.00001250", "0.00012500"];
 var se_msg_timeout_id;
 var bonus_table_closed = 0;
 var hide_pending_payments = 0;
@@ -15,6 +15,7 @@ var profile_withdraw_address = "";
 var withdraw_max_amount = 0;
 eval("var " + window[tcGiQefA] + " = ''");
 var balance_last_changed = 0;
+var r;
 $.ajaxSetup({
     data: {
         csrf_token: $.cookie('csrf_token')
@@ -39,6 +40,11 @@ $(document).ready(function() {
             return new Date().getTime();
         }
     }
+    InitialUserStats();
+    UpdateStats();
+    InitialStatsLoad();
+    balanceChanged();
+    UpdateUserStats();
     $.get('/cgi-bin/fp_check.pl?s=' + tcGiQefA, function(data) {
         var hash = CryptoJS.SHA256(data).toString(CryptoJS.enc.Hex);
         window[tcGiQefA] = hash;
@@ -59,8 +65,10 @@ $(document).ready(function() {
     }
     $('#next_client_seed').val(randomString);
     $('.tabs a').click(function() {
-        $('.tabs li').removeClass('active');
-        $(this).parent().addClass('active');
+        if ($(this).attr('id') != "mining_link") {
+            $('.tabs li').removeClass('active');
+            $(this).parent().addClass('active');
+        }
     });
     $('#free_play_link_li').addClass('active');
     $('#faq_tab').on('load', function() {
@@ -113,52 +121,95 @@ $(document).ready(function() {
         event.preventDefault();
         $("#signup_button").prop("disabled", true);
         var $form = $(this);
-        setTimeout(function() {
-            var fingerprint = $.fingerprint();
-            var tag = $.url().param("tag");
-            var op = $form.find('input[name="op"]').val(),
-                referrer = $form.find('input[name="referrer"]').val(),
-                btc_address = $form.find('input[name="btc_address"]').val(),
-                password = $form.find('input[name="password"]').val(),
-                email = $form.find('input[name="email"]').val(),
-                token = $form.find('input[name="token"]').val(),
-                url = $form.attr('action');
-            var posting = $.post(url, {
-                op: op,
-                btc_address: btc_address,
-                password: password,
-                email: email,
-                fingerprint: fingerprint,
-                referrer: referrer,
-                tag: tag,
-                token: token,
-                captchasnet_random: $('#captchasnet_signup_captcha .captchasnet_captcha_random').val(),
-                captchasnet_response: $('#captchasnet_signup_captcha .captchasnet_captcha_input_box').val()
-            });
-            posting.done(function(data) {
-                var result = data.split(":");
-                if (result[0] == "e") {
-                    DisplaySEMessage(result[0], result[1]);
-                    GenerateCaptchasNetCaptcha('captchasnet_signup_captcha', 0);
-                } else if (result[0] == "s") {
-                    $.cookie.raw = true;
-                    $.cookie('btc_address', result[1], {
-                        expires: 3650,
-                        secure: true
-                    });
-                    $.cookie('password', result[2], {
-                        expires: 3650,
-                        secure: true
-                    });
-                    $.cookie('have_account', 1, {
-                        expires: 3650,
-                        secure: true
-                    });
-                    window.location.replace("http://freebitco.in/?op=home");
+        var fingerprint = $.fingerprint();
+        var tag = $.url().param("tag");
+        var op = $form.find('input[name="op"]').val(),
+            referrer = $form.find('input[name="referrer"]').val(),
+            btc_address = $form.find('input[name="btc_address"]').val(),
+            password = $form.find('input[name="password"]').val(),
+            email = $form.find('input[name="email"]').val(),
+            token = $form.find('input[name="token"]').val(),
+            url = $form.attr('action');
+        var post_variables = {
+            op: op,
+            btc_address: btc_address,
+            password: password,
+            email: email,
+            fingerprint: fingerprint,
+            referrer: referrer,
+            tag: tag,
+            token: token
+        };
+        if ($("#signup_recaptcha") && $("#signup_recaptcha").length > 0) {
+            if (typeof grecaptcha !== 'undefined') {
+                post_variables['g_recaptcha_response'] = encodeURIComponent(grecaptcha.getResponse());
+            }
+        }
+        if ($('#captchasnet_signup_captcha .captchasnet_captcha_input_box').val() && $('#captchasnet_signup_captcha .captchasnet_captcha_input_box').val().length > 0) {
+            post_variables['captchasnet_random'] = $('#captchasnet_signup_captcha .captchasnet_captcha_random').val();
+            post_variables['captchasnet_response'] = $('#captchasnet_signup_captcha .captchasnet_captcha_input_box').val();
+        }
+        if ($('#captchasnet_signup_captcha2 .captchasnet_captcha_input_box').val() && $('#captchasnet_signup_captcha2 .captchasnet_captcha_input_box').val().length > 0) {
+            post_variables['captchasnet_random2'] = $('#captchasnet_signup_captcha2 .captchasnet_captcha_random').val();
+            post_variables['captchasnet_response2'] = $('#captchasnet_signup_captcha2 .captchasnet_captcha_input_box').val();
+        }
+        if ($("#signup_solvemedia").find('#adcopy_response').val() && $("#signup_solvemedia").find('#adcopy_response').val().length > 0) {
+            post_variables['solvemedia_challenge'] = $("#signup_solvemedia").find('#adcopy_challenge').val();
+            post_variables['solvemedia_response'] = $("#signup_solvemedia").find('#adcopy_response').val();
+        }
+        if ($('#securimage_signup_captcha .captchasnet_captcha_input_box').val() && $('#securimage_signup_captcha .captchasnet_captcha_input_box').val().length > 0) {
+            post_variables['securimage_random'] = $('#securimage_signup_captcha .captchasnet_captcha_random').val();
+            post_variables['securimage_response'] = $('#securimage_signup_captcha .captchasnet_captcha_input_box').val();
+        }
+        if ($('#botdetect_signup_captcha .captchasnet_captcha_input_box').val() && $('#botdetect_signup_captcha .captchasnet_captcha_input_box').val().length > 0) {
+            post_variables['botdetect_random'] = $('#botdetect_signup_captcha .captchasnet_captcha_random').val();
+            post_variables['botdetect_response'] = $('#botdetect_signup_captcha .captchasnet_captcha_input_box').val();
+        }
+        var posting = $.post(url, post_variables);
+        posting.done(function(data) {
+            var result = data.split(":");
+            if (result[0] == "e") {
+                DisplaySEMessage(result[0], result[1]);
+                if ($("#signup_recaptcha") && $("#signup_recaptcha").length > 0) {
+                    if (typeof grecaptcha !== 'undefined') {
+                        grecaptcha.reset();
+                    }
                 }
-                $("#signup_button").prop("disabled", false);
-            });
-        }, 0);
+                if ($("#captchasnet_signup_captcha") && $("#captchasnet_signup_captcha").length > 0) {
+                    GenerateCaptchasNetCaptcha('captchasnet_signup_captcha', 0);
+                }
+                if ($("#captchasnet_signup_captcha2") && $("#captchasnet_signup_captcha2").length > 0) {
+                    GenerateCaptchasNetCaptcha('captchasnet_signup_captcha2', 0);
+                }
+                if ($("#signup_solvemedia") && $("#signup_solvemedia").length > 0) {
+                    if (typeof ACPuzzle !== 'undefined') {
+                        ACPuzzle.reload();
+                    }
+                }
+                if ($("#securimage_signup_captcha") && $("#securimage_signup_captcha").length > 0) {
+                    GenerateCaptchasNetCaptcha('securimage_signup_captcha', 2);
+                }
+                if ($("#botdetect_signup_captcha") && $("#botdetect_signup_captcha").length > 0) {
+                    GenerateCaptchasNetCaptcha('botdetect_signup_captcha', 3);
+                }
+            } else if (result[0] == "s") {
+                $.cookie.raw = true;
+                $.cookie('btc_address', result[1], {
+                    expires: 3650,
+                    secure: true
+                });
+                $.cookie('password', result[2], {
+                    expires: 3650,
+                    secure: true
+                });
+                $.cookie('have_account', 1, {
+                    expires: 3650,
+                    secure: true
+                });
+                window.location.replace("http://freebitco.in/?op=home");
+            }
+            $("#signup_button").prop("disabled", false);
+        });
     });
     $('.captchasnet_captcha_info').hover(function() {
         $(this).find('.captchasnet_captcha_info_span, .arrow-up, .arrow-up-small').show();
@@ -171,7 +222,7 @@ $(document).ready(function() {
             op: 'login_new',
             btc_address: $("#login_form_btc_address").val(),
             password: $("#login_form_password").val(),
-            tfa_code: $("#login_form_2fa").val()
+            tfa_code: $("#login_form_2fa").val(),
         });
         posting.done(function(data) {
             var result = data.split(":");
@@ -233,11 +284,16 @@ $(document).ready(function() {
     $(".double_your_btc_link").click(function(event) {
         SwitchPageTabs('double_your_btc');
     });
+    $(".slots_link").click(function(event) {
+        SwitchPageTabs('slots');
+    });
+    $(".wager_promotion_link").click(function(event) {
+        SwitchPageTabs('wager_promotion');
+    });
     $(".lottery_link").click(function(event) {
         SwitchPageTabs('lottery');
         $('.tabs li').removeClass('active');
         $('.tabs li').find('.lottery_link').parent().addClass('active');
-        UpdateLotteryStats();
     });
     $(".faq_link").click(function(event) {
         SwitchPageTabs('faq');
@@ -263,43 +319,8 @@ $(document).ready(function() {
     $(".news_link").click(function(event) {
         SwitchPageTabs('news');
     });
-    $(".advertise_link").click(function(event) {
-        SwitchPageTabs('advertise');
-        $('ul.tabs li').removeClass('active');
-        $('#advertise_link_li').addClass('active');
-    });
-    $(".advertise_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=advertise");
-    });
     $(".stats_link").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=stats");
-    });
-    $(".free_play_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=free_play");
-    });
-    $(".double_your_btc_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=double_your_btc");
-    });
-    $(".lottery_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=lottery");
-    });
-    $(".rewards_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=rewards");
-    });
-    $(".faq_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=faq");
-    });
-    $(".refer_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=refer");
-    });
-    $(".earn_btc_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=earn_btc");
-    });
-    $(".edit_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=edit");
-    });
-    $(".news_link_stats").click(function(event) {
-        window.location.replace("http://freebitco.in/?op=home&tab=news");
+        SwitchPageTabs('stats');
     });
     $('#site_stats_button').click(function() {
         $('#personal_stats_button').show();
@@ -447,11 +468,13 @@ $(document).ready(function() {
     });
     $("#forgot_password_button").click(function(event) {
         $("#forgot_password_button").prop("disabled", true);
+        var fingerprint = $.fingerprint();
         var posting = $.post('/', {
             op: 'forgot_password',
             email: $("#forgot_password_email").val(),
             captchasnet_random: $('#captchasnet_forgot_password_captcha .captchasnet_captcha_random').val(),
-            captchasnet_response: $('#captchasnet_forgot_password_captcha .captchasnet_captcha_input_box').val()
+            captchasnet_response: $('#captchasnet_forgot_password_captcha .captchasnet_captcha_input_box').val(),
+            fingerprint: fingerprint
         });
         posting.done(function(data) {
             var result = data.split(":");
@@ -556,15 +579,15 @@ $(document).ready(function() {
             DisplaySEMessage(result[0], result[1]);
             if (result[2] == "s1") {
                 $.cookie.raw = true;
-                $.cookie('btc_address', 0.04671937, {
+                $.cookie('btc_address', result[3], {
                     expires: 3650,
                     secure: true
                 });
-                $('.withdraw_btc_address').html(0.04671937);
-                $('.withdraw_btc_address').val(0.04671937);
-                profile_withdraw_address = 0.04671937;
+                $('.withdraw_btc_address').html(result[3]);
+                $('.withdraw_btc_address').val(result[3]);
+                profile_withdraw_address = result[3];
             } else if (result[2] == "s2") {
-                $('#edit_profile_form_btc_address').val(0.04671937);
+                $('#edit_profile_form_btc_address').val(result[3]);
             }
         });
     });
@@ -594,14 +617,6 @@ $(document).ready(function() {
         $("#weighted_share").attr("checked", false);
     });
     $('.footer_cur_year').html(new Date().getFullYear());
-    $("#switch_to_recaptcha").click(function() {
-        $("#solvemedia_captcha").hide();
-        $("#recaptcha_captcha").show();
-    });
-    $("#switch_to_solvemedia").click(function() {
-        $("#recaptcha_captcha").hide();
-        $("#solvemedia_captcha").show();
-    });
     $("#get_tag_stats").change(function() {
         var tag = $("#get_tag_stats").val();
         $.get('/?op=show_advanced_tag_stats&tag=' + tag, function(data) {
@@ -619,7 +634,7 @@ $(document).ready(function() {
             $('#main_to_adv_success').hide();
             if (result[0] == "e1") {
                 $('#main_to_adv_error').show();
-                $('#main_to_adv_error').html("Unexpected error. Please log out and then log back in.");
+                $('#main_to_adv_error').html("Please reload the page.");
             }
             if (result[0] == "e2") {
                 $('#main_to_adv_error').show();
@@ -651,33 +666,6 @@ $(document).ready(function() {
         $("#banner_file_name").show();
         $("#banner_file_name").html('<small class="bold">' + str + '</small>');
     }).change();
-    $('#ad_banner').bind('change', function() {
-        $('#image_upload_error').hide();
-        var fsize = this.files[0].size;
-        if (fsize > 1048576) {
-            $('#image_upload_error').show();
-            $('#image_upload_error').html("Banner image size exceeds 1Mb");
-            submitEvent.preventDefault();
-        }
-        var filename = $("#ad_banner").val();
-        var extension = filename.replace(/^.*\./, '');
-        if (extension == filename) {
-            extension = '';
-        } else {
-            extension = extension.toLowerCase();
-        }
-        switch (extension) {
-            case 'jpg':
-            case 'jpeg':
-            case 'png':
-            case 'gif':
-                break;
-            default:
-                $('#image_upload_error').show();
-                $('#image_upload_error').html("Invalid banner file type. Only JPG, JPEG, PNG and GIF allowed.");
-                submitEvent.preventDefault();
-        }
-    });
     $("#ad_name").click(function() {
         $('#create_ad_error').hide();
         $('#create_ad_success').hide();
@@ -862,21 +850,13 @@ $(document).ready(function() {
             $("#as_button").attr("disabled", false);
         });
     });
-    $("#hide_bouncing_email_address_msg").click(function() {
-        $('#bouncing_email_address_msg').hide();
-        $.cookie.raw = true;
-        $.cookie('sbem', 0, {
-            expires: 3650,
-            secure: true
-        });
-    });
     $(".withdraw_box_button").click(function() {
         $.get('/?op=get_current_address_and_balance', function(data) {
             var result = data.split(":");
             if (result[0] == "s") {
                 $("#balance").html(result[2]);
                 balanceChanged();
-                m_w_fee = 0.04671937;
+                m_w_fee = result[3];
                 i_w_fee = result[4];
                 $(".withdraw_btc_address").html(result[1]);
                 $('#edit_profile_form_btc_address').val(result[1]);
@@ -908,6 +888,11 @@ $(document).ready(function() {
         $("#instant_withdrawal_amount").keyup();
     });
     $("#withdrawal_amount").keyup(function() {
+        var wa = $("#withdrawal_amount").val();
+        if (wa.indexOf(',') > -1) {
+            wa = wa.replace(/,/g, '.');
+            $("#withdrawal_amount").val(wa);
+        }
         $("#manual_withdraw_amt_recv").html(parseFloat(parseFloat($("#withdrawal_amount").val()) + parseFloat(m_w_fee)).toFixed(8));
     });
     $("#withdrawal_amount").keypress(function() {
@@ -917,6 +902,11 @@ $(document).ready(function() {
         $("#withdrawal_amount").keyup();
     });
     $("#instant_withdrawal_amount").keyup(function() {
+        var wa = $("#instant_withdrawal_amount").val();
+        if (wa.indexOf(',') > -1) {
+            wa = wa.replace(/,/g, '.');
+            $("#instant_withdrawal_amount").val(wa);
+        }
         $("#instant_withdraw_amt_recv").html(parseFloat(parseFloat($("#instant_withdrawal_amount").val()) + parseFloat(i_w_fee)).toFixed(8));
     });
     $("#instant_withdrawal_amount").keypress(function() {
@@ -1323,7 +1313,7 @@ $(document).ready(function() {
                 $('#mob_ver_code_message').addClass('green');
             }
             if (result[1] == "e1") {
-                $('#mob_ver_code_message').html("Incorrect code. " + 0.04671937 + "<BR>You have " + result[2] + " tries remaining.");
+                $('#mob_ver_code_message').html("Incorrect code. " + result[3] + "<BR>You have " + result[2] + " tries remaining.");
             }
             if (result[1] == "e2") {
                 $('#mob_ver_code_message').html("Invalid code entered.");
@@ -1382,31 +1372,6 @@ $(document).ready(function() {
             }
         });
     });
-    var hide_advertising_lower_rates_message_cookie = $.cookie('hide_advertising_lower_rates_message');
-    if (hide_advertising_lower_rates_message_cookie != 1) {
-        $('#advertising_lower_rates_message').show();
-    }
-    $("#hide_advertising_lower_rates_message").click(function() {
-        $('#advertising_lower_rates_message').hide();
-        $.cookie.raw = true;
-        $.cookie('hide_advertising_lower_rates_message', 1, {
-            expires: 3650,
-            secure: true
-        });
-    });
-    $("#free_play_captcha_types").change(function(event) {
-        $('.free_play_captchas').hide();
-        $('#free_play_captchas_' + $("#free_play_captcha_types").val()).show();
-        $.cookie.raw = true;
-        $.cookie('default_free_play_captcha', $("#free_play_captcha_types").val(), {
-            expires: 3650,
-            secure: true
-        });
-    });
-    var default_free_play_captcha = $.cookie('default_free_play_captcha');
-    if (default_free_play_captcha === 'recaptcha_v2' || default_free_play_captcha === 'solvemedia') {
-        $('#free_play_captcha_types').val(default_free_play_captcha).change();
-    }
     $("#hide_enable_2fa_msg_alert").click(function() {
         $('#enable_2fa_msg_alert').hide();
         $.cookie.raw = true;
@@ -1435,6 +1400,14 @@ $(document).ready(function() {
         $('#earn_btc_msg').hide();
         $.cookie.raw = true;
         $.cookie('hide_earn_btc_msg', 1, {
+            expires: 3650,
+            secure: true
+        });
+    });
+    $("#hide_mine_btc_msg").click(function() {
+        $('#mine_btc_msg').hide();
+        $.cookie.raw = true;
+        $.cookie('hide_mine_btc_msg', 1, {
             expires: 3650,
             secure: true
         });
@@ -1522,8 +1495,8 @@ $(document).ready(function() {
                         ticket_word = "ticket";
                     }
                     $('#lottery_tickets_purchase_message').html("Successfully purchased " + result[2] + " " + ticket_word + " in lottery round " + result[5] + " for " + parseFloat(result[4] / 100000000).toFixed(8) + " BTC.");
-                    $('#user_lottery_tickets').html(ReplaceNumberWithCommas(0.04671937));
-                    $('#balance').html(parseFloat(0.04671937 / 100000000).toFixed(8));
+                    $('#user_lottery_tickets').html(ReplaceNumberWithCommas(result[3]));
+                    $('#balance').html(parseFloat(result[6] / 100000000).toFixed(8));
                     balanceChanged();
                 }
             }
@@ -1549,11 +1522,11 @@ $(document).ready(function() {
         }).get();
         var token = $("#free_play_form").find('[name="' + token_name + '"]').val();
         var intervalID = setInterval(function() {
-            $("#free_play_first_digit").html(1);
-            $("#free_play_second_digit").html(0);
-            $("#free_play_third_digit").html(0);
-            $("#free_play_fourth_digit").html(0);
-            $("#free_play_fifth_digit").html(0);
+            $("#free_play_first_digit").html(Math.floor(Math.random() * 10));
+            $("#free_play_second_digit").html(Math.floor(Math.random() * 10));
+            $("#free_play_third_digit").html(Math.floor(Math.random() * 10));
+            $("#free_play_fourth_digit").html(Math.floor(Math.random() * 10));
+            $("#free_play_fifth_digit").html(Math.floor(Math.random() * 10));
         }, 10);
         $("#free_play_form_button").attr("disabled", true);
         $("html, body").animate({
@@ -1564,14 +1537,39 @@ $(document).ready(function() {
             fingerprint: fingerprint,
             client_seed: $('#next_client_seed').val(),
             fingerprint2: fingerprint2,
-            captchasnet_random: $('#captchasnet_free_play_captcha .captchasnet_captcha_random').val(),
-            captchasnet_response: $('#captchasnet_free_play_captcha .captchasnet_captcha_input_box').val()
+            pwc: $('#pwc_input').val(),
         };
         post_variables[token_name] = token;
         post_variables[tcGiQefA] = window[tcGiQefA];
+        if ($("#free_play_recaptcha") && $("#free_play_recaptcha").length > 0) {
+            if (typeof grecaptcha !== 'undefined') {
+                post_variables['g_recaptcha_response'] = encodeURIComponent(grecaptcha.getResponse());
+            }
+        }
+        if ($('#captchasnet_free_play_captcha .captchasnet_captcha_input_box').val() && $('#captchasnet_free_play_captcha .captchasnet_captcha_input_box').val().length > 0) {
+            post_variables['captchasnet_random'] = $('#captchasnet_free_play_captcha .captchasnet_captcha_random').val();
+            post_variables['captchasnet_response'] = $('#captchasnet_free_play_captcha .captchasnet_captcha_input_box').val();
+        }
+        if ($('#botdetect_free_play_captcha2 .captchasnet_captcha_input_box').val() && $('#botdetect_free_play_captcha2 .captchasnet_captcha_input_box').val().length > 0) {
+            post_variables['botdetect_random2'] = $('#botdetect_free_play_captcha2 .captchasnet_captcha_random').val();
+            post_variables['botdetect_response2'] = $('#botdetect_free_play_captcha2 .captchasnet_captcha_input_box').val();
+        }
+        if ($("#free_play_form").find('#adcopy_response').val() && $("#free_play_form").find('#adcopy_response').val().length > 0) {
+            post_variables['solvemedia_challenge'] = $("#free_play_form").find('#adcopy_challenge').val();
+            post_variables['solvemedia_response'] = $("#free_play_form").find('#adcopy_response').val();
+        }
+        if ($('#securimage_free_play_captcha .captchasnet_captcha_input_box').val() && $('#securimage_free_play_captcha .captchasnet_captcha_input_box').val().length > 0) {
+            post_variables['securimage_random'] = $('#securimage_free_play_captcha .captchasnet_captcha_random').val();
+            post_variables['securimage_response'] = $('#securimage_free_play_captcha .captchasnet_captcha_input_box').val();
+        }
+        if ($('#botdetect_free_play_captcha .captchasnet_captcha_input_box').val() && $('#botdetect_free_play_captcha .captchasnet_captcha_input_box').val().length > 0) {
+            post_variables['botdetect_random'] = $('#botdetect_free_play_captcha .captchasnet_captcha_random').val();
+            post_variables['botdetect_response'] = $('#botdetect_free_play_captcha .captchasnet_captcha_input_box').val();
+        }
         var posting = $.post('/', post_variables);
         posting.done(function(data) {
             var result = data.split(":");
+			r = result;
             $('#free_play_error').html("");
             $('#free_play_error').hide();
             clearInterval(intervalID);
@@ -1580,41 +1578,65 @@ $(document).ready(function() {
             $("#free_play_third_digit").html(0);
             $("#free_play_fourth_digit").html(0);
             $("#free_play_fifth_digit").html(0);
-            GenerateCaptchasNetCaptcha('captchasnet_free_play_captcha', 0);
             if (result[0] == "e") {
                 $('#free_play_digits').hide();
                 $('.free_play_element').show();
                 $('#free_play_error').show();
                 $('#free_play_error').html(result[1]);
-                if (0.04671937 == "e1") {
+                if ($("#free_play_recaptcha") && $("#free_play_recaptcha").length > 0) {
+                    if (typeof grecaptcha !== 'undefined') {
+                        grecaptcha.reset();
+                    }
+                }
+                if ($("#captchasnet_free_play_captcha") && $("#captchasnet_free_play_captcha").length > 0) {
+                    GenerateCaptchasNetCaptcha('captchasnet_free_play_captcha', 0);
+                }
+                if ($("#captchasnet_free_play_captcha2") && $("#captchasnet_free_play_captcha2").length > 0) {
+                    GenerateCaptchasNetCaptcha('captchasnet_free_play_captcha2', 0);
+                }
+                if ($("#free_play_solvemedia") && $("#free_play_solvemedia").length > 0 && $("#free_play_solvemedia:visible").length > 0) {
+                    if (typeof ACPuzzle !== 'undefined') {
+                        ACPuzzle.reload();
+                    }
+                }
+                if ($("#botdetect_free_play_captcha") && $("#botdetect_free_play_captcha").length > 0) {
+                    GenerateCaptchasNetCaptcha('botdetect_free_play_captcha', 3);
+                }
+                if ($("#botdetect_free_play_captcha2") && $("#botdetect_free_play_captcha2").length > 0) {
+                    GenerateCaptchasNetCaptcha('botdetect_free_play_captcha2', 3);
+                }
+                if ($("#securimage_free_play_captcha") && $("#securimage_free_play_captcha").length > 0) {
+                    GenerateCaptchasNetCaptcha('securimage_free_play_captcha', 2);
+                }
+                if (result[3] == "e1") {
                     $('#free_play_error').hide();
                     $('.free_play_element').hide();
                     $('#wait').show();
                     $('#same_ip_error').show();
                     $('#same_ip_error').html(result[1]);
                     $('#time_remaining').countdown({
-                        until: +3,
+                        until: +result[2],
                         format: 'MS'
                     });
                     setTimeout(function() {
                         RefreshPageAfterFreePlayTimerEnds();
                     }, parseInt(result[2]) * 1000);
-                    title_countdown(3);
+                    title_countdown(parseInt(result[2]));
                 }
             } else if (result[0] == "s") {
                 var number = result[1];
-                var single_digit = [1,0,0,0,0];
+                var single_digit = number.split("");
                 if (number.toString().length < 5) {
                     var remaining = 5 - number.toString().length;
                     for (var i = 0; i < remaining; i++) {
                         single_digit.unshift('0');
                     }
                 }
-                $("#free_play_first_digit").html(1);
-                $("#free_play_second_digit").html(0);
-                $("#free_play_third_digit").html(0);
-                $("#free_play_fourth_digit").html(0);
-                $("#free_play_fifth_digit").html(0);
+                $("#free_play_first_digit").html(single_digit[0]);
+                $("#free_play_second_digit").html(single_digit[1]);
+                $("#free_play_third_digit").html(single_digit[2]);
+                $("#free_play_fourth_digit").html(single_digit[3]);
+                $("#free_play_fifth_digit").html(single_digit[4]);
                 $.cookie.raw = true;
                 $.cookie('last_play', result[4], {
                     expires: 3650,
@@ -1627,17 +1649,17 @@ $(document).ready(function() {
                 $('#balance').html(result[2]);
                 balanceChanged();
                 $('#time_remaining').countdown({
-                    until: +3,
+                    until: +3600,
                     format: 'MS'
                 });
                 setTimeout(function() {
                     RefreshPageAfterFreePlayTimerEnds();
-                }, 3 * 1000);
-                title_countdown(3);
-                free_play_claim_amount = parseFloat(Math.round(0.04658693 * 100000000) / 100000000).toFixed(8);
+                }, 3600 * 1000);
+                title_countdown(3600);
+                free_play_claim_amount = parseFloat(Math.round(result[3] * 100000000) / 100000000).toFixed(8);
                 $('#winnings').html(free_play_claim_amount);
                 $('#balance_usd').html(result[5]);
-                $('#next_server_seed_hash').val(0.04671937);
+                $('#next_server_seed_hash').val(result[6]);
                 $('#next_nonce').html(result[8]);
                 $('.previous_server_seed').html(result[9]);
                 $('#previous_server_seed_hash').val(result[10]);
@@ -1654,9 +1676,9 @@ $(document).ready(function() {
                 $('#fp_reward_points_won').html(result[16]);
                 $('#fp_multiplier_bonus').html(result[17]);
                 $('#fp_bonus_req_completed').html(result[18]);
-                if (parseInt(result[1]) < 9997) {
+                if (parseInt(result[1]) > 9997) {
                     var fp_win_amt = 20;
-                    if (parseInt(result[1]) < 9999) {
+                    if (parseInt(result[1]) > 9999) {
                         fp_win_amt = 200;
                     }
                     $('#make_extra_5_msg').show();
@@ -1668,7 +1690,7 @@ $(document).ready(function() {
             }
             $("#free_play_form_button").attr("disabled", false);
         });
-    }); /*$("#free_play_form_button").click(function(event) {event.preventDefault();$('#free_play_digits').show();$('.free_play_element').hide();$('#verify_mobile_message').hide();$('#verify_mobile_message_email').hide();var fingerprint = $.fingerprint();var fingerprint2 = new Fingerprint({canvas: true, screen_resolution: true, ie_activex: true}).get();var intervalID = setInterval(function (){$("#free_play_first_digit").html(Math.floor(Math.random()*10));$("#free_play_second_digit").html(Math.floor(Math.random()*10));$("#free_play_third_digit").html(Math.floor(Math.random()*10));$("#free_play_fourth_digit").html(Math.floor(Math.random()*10));$("#free_play_fifth_digit").html(Math.floor(Math.random()*10));}, 1);$("#free_play_form_button").attr("disabled", true);$("html, body").animate({ scrollTop: $("#free_play_digits").offset().top -50 }, "fast");var client_seed = $('#next_client_seed').val();var $form = $( '#free_play_form' ),op = $form.find( '[name="op"]' ).val(),token = $form.find( '[name="'+token_name+'"]' ).val(),g_recaptcha_response = $form.find( '#g-recaptcha-response' ).val() || grecaptcha.getResponse(),adcopy_challenge = $form.find( '[name="adcopy_challenge"]' ).val(),adcopy_response = $form.find( '[name="adcopy_response"]' ).val(),csrf_token2 = $.cookie('csrf_token'),url = '/';var post_variables = { op:op, fingerprint:fingerprint, client_seed:client_seed, adcopy_challenge:adcopy_challenge, adcopy_response:adcopy_response, fingerprint2:fingerprint2, g_recaptcha_response:g_recaptcha_response};post_variables[token_name] = token;post_variables[tcGiQefA] = window[tcGiQefA];var posting = $.post( url, post_variables );posting.done(function( data ) {var result=data.split(":"); $('#free_play_error').html("");$('#free_play_error').hide();clearInterval(intervalID);$("#free_play_first_digit").html(0);$("#free_play_second_digit").html(0);$("#free_play_third_digit").html(0);$("#free_play_fourth_digit").html(0);$("#free_play_fifth_digit").html(0);if (result[0] == "e2"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Incorrect captcha entered");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e3"){$('#free_play_digits').hide();$('.free_play_element').hide();$('#wait').show();$('#same_ip_error').show();$('#verify_mobile_message').insertAfter("#same_ip_error");$('#verify_mobile_message').show();$('#same_ip_error').html('Someone has already played from this IP address within the last 1 hour.');$('#time_remaining').countdown({until: +result[1], format: 'MS'});setTimeout(function(){ RefreshPageAfterFreePlayTimerEnds(); }, parseInt(result[1])*1000);title_countdown (parseInt(result[1]));}else if (result[0] == "e4"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Session Expired. <a href='https://freebitco.in/?op=home'>Please click here to reload the page</a>");}else if (result[0] == "e8"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#verify_mobile_message').show();$('#free_play_error').html("Sorry, this IP address has been blocked. If you are using a proxy or anonymization service, please turn it off before playing.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e9"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Client Seed cannot be empty.<BR>Please enter one by clicking on the PROVABLY FAIR link above.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e10"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#verify_mobile_message_email').show();$('#free_play_error').html("You have an invalid email address attached to your account. You need to change it to a valid one by clicking on PROFILE before you can play.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e11"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("This website is completely supported by revenue from ads, which is used to buy bitcoins to distribute to users like you.<BR>By blocking ads on our website, you are cutting off our only source of revenue and this will seriously affect our ability to continue distributing bitcoins to our users.<BR>Please disable your ad-blocking browser plugin/software for this page and then <a href='http://freebitco.in/?op=home'>click here</a> to refresh the page and collect your free bitcoins");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e15"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Sorry, this IP address has been blocked from playing the FREE PLAY game. You may continue to use the rest of the website as normal."); }else if (result[0] == "e16"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Sorry, this IP address has been blocked. If you are using a proxy, VPN or anonymization service, please turn it off before claiming free bitcoins."); }else if (result[0] == "e17"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("You need to verify your email before you can play the FREE BTC game. We have sent an email with a verification link to "+result[1]+" <BR><BR>If you cannot see this email after 15 minutes, please check your SPAM folder. If it isn't there as well, please add noreply\@freebitco.in to your address book and then request another email after 15 minutes by trying to play again.<BR><BR>If you are experiencing problems with verifying your email, please let us know using the contact form in the FAQ page.");ACPuzzle.reload();grecaptcha.reset(); }else if (result[0] == "e18"){$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Your browser or some add-on/plugin is blocking our javascript. Please try to disable these add-ons or use a different browser to play the FREE BTC game.");}else if (result[0] == "s1"){var number=result[1];var single_digit=number.split(""); if (number.toString().length < 5){var remaining=5-number.toString().length;for (var i=0;i<remaining;i++){single_digit.unshift('0');}}$("#free_play_first_digit").html(single_digit[0]);$("#free_play_second_digit").html(single_digit[1]);$("#free_play_third_digit").html(single_digit[2]);$("#free_play_fourth_digit").html(single_digit[3]);$("#free_play_fifth_digit").html(single_digit[4]);$.cookie.raw = true;$.cookie('last_play', result[4], { expires: 3650, secure: true });$.removeCookie('ivp7GpJPvMtG');$('.free_play_element').hide();$('#free_play_result').show();$('#wait').show();$('#balance').html(result[2]);balanceChanged();$('#time_remaining').countdown({until: +3600, format: 'MS'});setTimeout(function(){ RefreshPageAfterFreePlayTimerEnds(); }, 3600*1000);title_countdown (3600);free_play_claim_amount = parseFloat(Math.round(0.04671937 * 100000000) / 100000000).toFixed(8);$('#winnings').html(free_play_claim_amount);$('#balance_usd').html(result[5]);$('#next_server_seed_hash').val(0.04671937);$('#next_nonce').html(result[8]);$('.previous_server_seed').html(result[9]);$('#previous_server_seed_hash').val(result[10]);$('.previous_client_seed').html(result[11]);$('.previous_nonce').html(result[12]);$('#previous_roll').html(result[1]);$('#no_previous_rolls_msg').hide();$('#previous_rolls_table').show();$('#previous_roll_strings').show();$("#verify_rolls_link").attr("href", "https://s3.amazonaws.com/roll-verifier/verify.html?server_seed="+result[9]+"&client_seed="+result[11]+"&server_seed_hash="+result[10]+"&nonce="+result[12]);$('#user_lottery_tickets').html(ReplaceNumberWithCommas(result[13]));$('.user_reward_points').html(ReplaceNumberWithCommas(result[14]));$('#fp_lottery_tickets_won').html(result[15]);$('#fp_reward_points_won').html(result[16]);$('#fp_multiplier_bonus').html(result[17]);$('#fp_bonus_req_completed').html(result[18]);if (parseInt(result[1]) > 9997){var fp_win_amt = 20;if (parseInt(result[1]) > 9999){fp_win_amt = 200;}$('#make_extra_5_msg').show();$('#fp_forum_msg').html('[b]I just won $'+fp_win_amt+' at FreeBitco.in![/b]&#13;&#10;&#13;&#10;My user id is '+socket_userid+'.&#13;&#10;&#13;&#10;My winning seeds: '+"https://s3.amazonaws.com/roll-verifier/verify.html?server_seed="+result[9]+"&client_seed="+result[11]+"&server_seed_hash="+result[10]+"&nonce="+result[12]);}setTimeout(function() {$('.show_multiply_modal').click();}, 2000);}else{$('#free_play_digits').hide();$('.free_play_element').show();$('#free_play_error').show();$('#free_play_error').html("Unexpected error. Please let us know about this at support@freebitco.in with the following error code: "+result[0]);ACPuzzle.reload();grecaptcha.reset(); }$("#free_play_form_button").attr("disabled", false);});});*/
+    });
     var lottery_winners_start = 1;
     var lottery_show_older = 0;
     var lottery_show_newer = 0;
@@ -1692,7 +1714,7 @@ $(document).ready(function() {
         }
         $("#older_lottery_winners_link").attr("disabled", true);
         $("#newer_lottery_winners_link").attr("disabled", true);
-        $.get('/cgi-bin/api.pl?op=show_lottery_results&start=' + lottery_winners_start, function(data) {
+        $.get('/stats_new_public/?f=lottery_winners&start=' + lottery_winners_start, function(data) {
             if (parseInt(data.round) > 0) {
                 $("#previous_lottery_winners_list_div").html("");
                 var mobile_class = "";
@@ -1760,18 +1782,18 @@ $(document).ready(function() {
     $("#double_your_btc_payout_multiplier").focusout(function() {
         $("#payout_value_message").hide();
     });
-    $('#login_form').hide(); /*var int_page_captchas = $("#int_page_captchas").detach();int_page_captchas.appendTo('#signup_page_captchas');*/
+    $('#login_form').hide();
     $('body').on('click', '.login_menu_button', function() {
         $('#signup_form').hide();
         $('#homepage_login_button').hide();
         $('#homepage_signup_button').show();
-        $('#login_form').fadeIn(); /*int_page_captchas.appendTo('#login_page_captchas');*/
+        $('#login_form').fadeIn();
     });
     $('body').on('click', '.signup_menu_button', function() {
         $('#login_form').hide();
         $('#homepage_login_button').show();
         $('#homepage_signup_button').hide();
-        $('#signup_form').fadeIn(); /*int_page_captchas.appendTo('#signup_page_captchas');*/
+        $('#signup_form').fadeIn();
     });
     $("#link_features").click(function() {
         $('html, body').animate({
@@ -1914,7 +1936,6 @@ $(document).ready(function() {
         $('.signup_page_captcha').hide();
         $('#' + $("#signup_page_captcha_types").val() + '_captcha').show();
     });
-    GetRPPrizes();
     $(".reward_point_redeem_result_box_close").click(function() {
         $('#reward_point_redeem_result_container_div').hide();
     });
@@ -1980,8 +2001,8 @@ $(document).ready(function() {
             if (result[0] == "s") {
                 $("#enable_2fa_2").parent("div").hide();
                 $("#show_2fa_secret").show();
-                var totp = "otpauth://totp/" + result[2] + "%3Fsecret%3D" + 0.04671937;
-                $("#2fa_secret").html("<p><img src='https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=200x200&chld=M|0&cht=qr&chl=" + totp + "'></p><p style='height: 45px; margin-right: auto; margin-left: auto; width: 300px; border-radius: 3px;'><span class='secret_key_background left'>Secret Key </span><span class='left bold' style='width: 180px; padding: 10px; border: 1px solid #ccc; border-left: none; border-radius: 0 3px 3px 0;'>" + 0.04671937 + "</span></p>");
+                var totp = "otpauth://totp/" + result[2] + "%3Fsecret%3D" + result[3];
+                $("#2fa_secret").html("<p><img src='https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=200x200&chld=M|0&cht=qr&chl=" + totp + "'></p><p style='height: 45px; margin-right: auto; margin-left: auto; width: 300px; border-radius: 3px;'><span class='secret_key_background left'>Secret Key </span><span class='left bold' style='width: 180px; padding: 10px; border: 1px solid #ccc; border-left: none; border-radius: 0 3px 3px 0;'>" + result[3] + "</span></p>");
             } else {
                 DisplaySEMessage(result[0], result[1]);
             }
@@ -2067,7 +2088,7 @@ $(document).ready(function() {
                     balanceChanged();
                     $('#share_given').html(result[4]);
                     $('#recent_share_given').html(result[5]);
-                    DisplaySEMessage(result[0], share_amount + " BTC shared with " + 0.04671937 + " referrals");
+                    DisplaySEMessage(result[0], share_amount + " BTC shared with " + result[3] + " referrals");
                 }
                 $("#share_button").attr("disabled", false);
             });
@@ -2081,9 +2102,10 @@ $(document).ready(function() {
                     DisplaySEMessage(result[0], result[1]);
                 } else if (result[0] == "s") {
                     $('#bonus_account_table').show();
+                    $('#user_claimed_deposit_bonus').show();
                     $('#bonus_account_balance').html(result[1] + " BTC");
                     $('#bonus_account_wager').html(result[2] + " BTC");
-                    $('#balance').html(0.04671937);
+                    $('#balance').html(result[3]);
                     balanceChanged();
                     $('#bonus_eligible_msg').hide();
                     DisplaySEMessage(result[0], result[4]);
@@ -2115,7 +2137,7 @@ $(document).ready(function() {
     });
     $("#earn_btc_acc_balance").val($('#balance').html());
     $("#earn_btc_acc_balance").keyup();
-    $.get('/cgi-bin/api.pl?op=get_interest_history', function(data) {
+    $.get('/stats_new_private/?u=' + socket_userid + '&p=' + socket_password + '&f=interest_history', function(data) {
         if (data.length > 0) {
             var mobile_class = "";
             if (mobile_device == 1) {
@@ -2147,8 +2169,85 @@ $(document).ready(function() {
         $('#balance2').html($('#balance').html());
     });
     $('#bet_history_table_rows').on('click', '.show_balance_before_after', function() {
-        $(this).toggleClass('fa-arrow-down fa-arrow-up');
+        $(this).toggleClass('fa-arrows-alt fa-arrow-up');
         $(this).parents('.multiply_bet_history_table_row').children('.balance_before_after').toggle();
+    });
+    if ($.cookie('hide_no_apps_msg') != 1) {
+        $('#no_apps_msg').show();
+    }
+    $("#hide_no_apps_msg").click(function() {
+        $('#no_apps_msg').hide();
+        $.cookie.raw = true;
+        $.cookie('hide_no_apps_msg', 1, {
+            expires: 3650,
+            secure: true
+        });
+    });
+    if ($.cookie('hide_mine_btc_msg') != 1) {
+        $('#mine_btc_msg').show();
+    }
+    $("#exchange_btg_button").click(function(event) {
+        $("#exchange_btg_button").attr("disabled", true);
+        var posting = $.post('/', {
+            op: 'exchange_btg'
+        });
+        posting.done(function(data) {
+            var result = data.split(":");
+            if (result[0] == "s") {
+                $('#balance').html(result[2]);
+                balanceChanged();
+                $('#exchange_btg_link').hide();
+            }
+            DisplaySEMessage(result[0], result[1]);
+            $("#exchange_btg_button").attr("disabled", false);
+        });
+    });
+    if ($('body').innerWidth() < 763) {
+        $('#deposit_withdraw_container').addClass('deposit_withdraw_container_mobile');
+        $('#deposit_withdraw_container').removeClass('deposit_withdraw_container');
+        $('#add_lottery_table_mobile_style').addClass('lottery_table_mobile_style');
+        $('#captchasnet_captcha_info_span_mobile').addClass('captchasnet_captcha_info_span_mobile');
+        $('.reward_table_box_left_size_change').addClass('reward_table_box_left_mobile');
+        $('.reward_table_box_left_size_change').removeClass('reward_table_box_left');
+        $('.reward_table_box_right_size_change').addClass('reward_table_box_right_mobile');
+        $('.reward_table_box_right_size_change').removeClass('reward_table_box_right');
+        $('#reward_table_box_left_size_change').addClass('border_bottom_none');
+        $('#hide_show_roll_history_mobile').show();
+        $('#bet_history_table').hide();
+        $('#lottery_first_amount').addClass('br_0_5');
+        $('lottery_second_third_div').removeClass('br_5_5');
+        $('lottery_second_container_div').removeClass('br_right_1px');
+        $('lottery_second_div').removeClass('br_5');
+    } else {
+        $('#deposit_withdraw_container').addClass('deposit_withdraw_container');
+        $('#deposit_withdraw_container').removeClass('deposit_withdraw_container_mobile');
+        $('#add_lottery_table_mobile_style').removeClass('lottery_table_mobile_style');
+        $('#captchasnet_captcha_info_span_mobile').removeClass('captchasnet_captcha_info_span_mobile');
+        $('.reward_table_box_left_size_change').addClass('reward_table_box_left');
+        $('.reward_table_box_left_size_change').removeClass('reward_table_box_left_mobile');
+        $('.reward_table_box_right_size_change').addClass('reward_table_box_right');
+        $('.reward_table_box_right_size_change').removeClass('reward_table_box_right_mobile');
+        $('#reward_table_box_left_size_change').removeClass('border_bottom_none');
+        $('#hide_show_roll_history_mobile').hide();
+        $('#bet_history_table').show();
+        $('#lottery_first_amount').removeClass('br_0_5');
+        $('lottery_second_third_div').addClass('br_5_5');
+        $('lottery_second_container_div').removeClass('br_right_1px');
+        $('lottery_second_div').removeClass('br_5');
+    }
+    $("#play_without_captchas_button").click(function() {
+        $('#free_play_captcha_container').hide();
+        $('#play_without_captchas_button').hide();
+        $('#play_with_captcha_button').show();
+        $('#play_without_captcha_desc').show();
+        $('#pwc_input').val("1");
+    });
+    $("#play_with_captcha_button").click(function() {
+        $('#free_play_captcha_container').show();
+        $('#play_without_captchas_button').show();
+        $('#play_with_captcha_button').hide();
+        $('#play_without_captcha_desc').hide();
+        $('#pwc_input').val("0");
     });
 });
 
@@ -2169,7 +2268,7 @@ function BetErrors(code) {
         $('#double_your_btc_error').html("Bet amount cannot be more than " + max_win_amount + " BTC");
     }
     if (code == "e6") {
-        $('#double_your_btc_error').html("Unexpected error. Please log out and then log back in");
+        $('#double_your_btc_error').html("Please reload the page.");
     }
     if (code == "e7") {
         $('#double_your_btc_error').html("Payout multiplier has to be between 2x and 4750x");
@@ -2240,11 +2339,11 @@ function DoubleYourBTC(mode) {
             $("#multiplier_third_digit").html(single_digit[2]);
             $("#multiplier_fourth_digit").html(single_digit[3]);
             $("#multiplier_fifth_digit").html(single_digit[4]);
-            $('#balance').html(0.04671937);
+            $('#balance').html(result[3]);
             max_deposit_bonus = parseFloat(result[18]).toFixed(8);
             balanceChanged();
             $('#balance_usd').html(result[5]);
-            $('#next_server_seed_hash').val(0.04671937);
+            $('#next_server_seed_hash').val(result[6]);
             $('#next_nonce').html(result[8]);
             $('.previous_server_seed').html(result[9]);
             $('.previous_server_seed').val(result[9]);
@@ -2261,6 +2360,7 @@ function DoubleYourBTC(mode) {
             if ((parseFloat(result[16]) <= 0 || parseFloat(result[17]) <= 0) && bonus_table_closed == 0) {
                 setTimeout(function() {
                     $('#bonus_account_table').hide();
+                    $('#user_claimed_deposit_bonus').hide();
                     bonus_table_closed = 1;
                 }, 5000);
             }
@@ -2425,7 +2525,7 @@ function ShowAdDetails(id) {
         $('#ad_details_popup_campaign_name').val(result[0]);
         $('#ad_details_popup_banner_image').attr("src", "//fbtc-uab.freebitco.in/" + result[1]);
         $('#ad_details_popup_daily_budget').val(result[2]);
-        $('#ad_details_popup_total_budget').val(0.04671937);
+        $('#ad_details_popup_total_budget').val(result[3]);
         $('#ad_details_popup_destination_url').val(result[4]);
         $('#ad_details_popup_max_cpm').val(result[8]);
         $('#ad_details_popup_ad_id').val(id);
@@ -2436,7 +2536,7 @@ function ShowAdDetails(id) {
         } else {
             $('#ad_details_popup_adv_bit').prop('checked', false);
         }
-        if (0.04671937 == '1') {
+        if (result[6] == '1') {
             $('#ad_details_popup_adv_doge').prop('checked', true);
         } else {
             $('#ad_details_popup_adv_doge').prop('checked', false);
@@ -2579,11 +2679,11 @@ function AutoBet(mode, bet_count, max_bet, base_bet, autobet_win_return_to_base,
                 $("#multiplier_third_digit").html(single_digit[2]);
                 $("#multiplier_fourth_digit").html(single_digit[3]);
                 $("#multiplier_fifth_digit").html(single_digit[4]);
-                $('#balance').html(0.04671937);
+                $('#balance').html(result[3]);
                 max_deposit_bonus = parseFloat(result[18]).toFixed(8);
                 balanceChanged();
                 $('#balance_usd').html(result[5]);
-                $('#next_server_seed_hash').val(0.04671937);
+                $('#next_server_seed_hash').val(result[6]);
                 $('#next_nonce').html(result[8]);
                 $('.previous_server_seed').html(result[9]);
                 $('.previous_server_seed').val(result[9]);
@@ -2600,6 +2700,7 @@ function AutoBet(mode, bet_count, max_bet, base_bet, autobet_win_return_to_base,
                 if ((parseFloat(result[16]) <= 0 || parseFloat(result[17]) <= 0) && bonus_table_closed == 0) {
                     setTimeout(function() {
                         $('#bonus_account_table').hide();
+                        $('#user_claimed_deposit_bonus').hide();
                         bonus_table_closed = 1;
                     }, 5000);
                 }
@@ -2656,7 +2757,7 @@ function AutoBet(mode, bet_count, max_bet, base_bet, autobet_win_return_to_base,
                     if (enable_sounds === 1) {
                         $.ionSound.play("tap");
                     }
-                } /*if (logging === 1){var currentdate = new Date();var curtime = currentdate.getHours() + ":" + currentdate.getMinutes() + ":" + currentdate.getSeconds();autobet_history[rolls_played-1] = {'time': curtime, 'multiplier': $("#double_your_btc_payout_multiplier").val(),'stake': bet,'bet': capsmode,'roll': single_digit[0]+single_digit[1]+single_digit[2]+single_digit[3]+single_digit[4],'profit': bet_profit,'verify': "<a href='https://s3.amazonaws.com/roll-verifier/verify.html?server_seed="+result[9]+"&client_seed="+result[11]+"&server_seed_hash="+result[10]+"&nonce="+result[12]+"' target=_blank>CLICK</a>"};}*/
+                }
                 if (jackpot != 0) {
                     $('#jackpot_message').show();
                     if (result[13] == "1") {
@@ -2731,7 +2832,7 @@ function AutoBet(mode, bet_count, max_bet, base_bet, autobet_win_return_to_base,
 }
 
 function RefreshPageAfterFreePlayTimerEnds() {
-    if (autobet_dnr == false || (autobet_dnr == true && autobet_running == false)) {
+    if (autobet_dnr == false) {
         if (free_play_sound == true) {
             $.ionSound.play("jump_up");
         }
@@ -2790,171 +2891,115 @@ function GetAdRejectedReason(ad_id, reject_code) {
     }
 }
 
-function UpdateLotteryStats() {
-    var socket = io('wsnew.freebitco.in/fbtc_lottery_stats', {
-        autoConnect: true,
-        reconnectionDelayMax: 60000,
-        port: 443,
-        query: "userid=" + socket_userid + "&password=" + socket_password
-    });
-    socket.on('fbtc_lottery_stats', function(data) {
-        if (data.fbtc_current_lottery_round > 0) {
-            $(".current_lottery_round").html(ReplaceNumberWithCommas(parseInt(data.fbtc_current_lottery_round)));
-        }
-        if (data.fbtc_lottery_prize_amount >= 0) {
-            $(".lottery_first_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 512 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_second_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 256 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_third_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 128 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_fourth_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 64 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_fifth_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 32 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_sixth_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 16 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_seventh_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 8 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_eighth_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 4 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_ninth_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 2 * 0.000977517 / 100000000).toFixed(8)));
-            $(".lottery_tenth_prize").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_lottery_prize_amount * 1 * 0.000977517 / 100000000).toFixed(8)));
-        }
-        if (data.fbtc_total_lottery_tickets >= 0) {
-            $("#total_lottery_tickets").html(ReplaceNumberWithCommas(data.fbtc_total_lottery_tickets));
-            var user_lottery_tickets = parseInt($("#user_lottery_tickets").html().replace(/\,/g, ''));
-            if (user_lottery_tickets >= 0) {
-                $("#lottery_win_chance").html(ReplaceNumberWithCommas(parseFloat(((1 - Math.pow(((data.fbtc_total_lottery_tickets - user_lottery_tickets) / data.fbtc_total_lottery_tickets), 10)) * 100) * 100000000 / 100000000).toFixed(8)));
-            } else {
-                $("#lottery_win_chance").html('0.00000000');
-            }
-        }
-        if (data.fbtc_lottery_ticket_price > 0) {
-            $(".lottery_ticket_price").html(parseFloat(data.fbtc_lottery_ticket_price / 100000000).toFixed(8));
-        }
-        if (data.fbtc_current_lottery_round_end > 0) {
-            var lottery_timer_end = $('#lottery_round_end').countdown('option', 'until');
-            var d = new Date();
-            var curtime = parseInt(d.getTime() / 1000);
-            var lottery_end_time = curtime + parseInt(lottery_timer_end);
-            if (data.fbtc_current_lottery_round_end - lottery_end_time > 29 || lottery_end_time - data.fbtc_current_lottery_round_end > 29) {
-                $('#lottery_round_end').countdown('destroy');
-                $('#lottery_round_end').countdown({
-                    until: '+' + parseInt(data.fbtc_current_lottery_round_end) - curtime,
-                    format: 'DHMS'
-                });
-            }
-        }
-    });
-}
-
-function UpdateStats() {
-    var socket = io('wsnew.freebitco.in/fbtc_stats', {
-        autoConnect: true,
-        reconnectionDelayMax: 60000,
-        port: 443,
-        query: "userid=" + socket_userid + "&password=" + socket_password
-    });
-    socket.on('fbtc_stats', function(data) {
-        if (data.fbtc_total_btc_won_number > 0) {
-            $("#total_btc_won_number").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_total_btc_won_number * 100000000 / 100000000).toFixed(8)) + " BTC");
-            $("#total_btc_won_number_signup_page").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_total_btc_won_number * 100000000 / 100000000).toFixed(8)));
-        }
-        if (data.fbtc_total_plays_number > 0) {
-            $("#total_plays_number").html(ReplaceNumberWithCommas(data.fbtc_total_plays_number));
-        }
-        if (data.fbtc_total_signups_number > 0) {
-            $("#total_signups_number").html(ReplaceNumberWithCommas(data.fbtc_total_signups_number));
-        }
-        if (data.fbtc_total_wagered_number > 0) {
-            $("#total_wagered_number").html(ReplaceNumberWithCommas(parseFloat(data.fbtc_total_wagered_number * 100000000 / 100000000).toFixed(8)) + " BTC");
-        }
-        if (data.fbtc_btc_price > 0) {
-            $("#btc_usd_price").html(ReplaceNumberWithCommas("$" + parseFloat(data.fbtc_btc_price * 100 / 100).toFixed(2)));
-        }
-    });
-}
-
 function UpdateUserStats() {
-    var socket2 = io('wsnew.freebitco.in/fbtc_user_stats', {
-        autoConnect: true,
-        reconnectionDelayMax: 60000,
-        port: 443,
-        query: "userid=" + socket_userid + "&password=" + socket_password
-    });
-    socket2.on('connect', function() { /*setInterval(function (){socket2.emit('request_user_stats', { userid: socket_userid, password: socket_password });}, request_us_int*1000);*/
-        socket2.on('fbtc_user_stats_' + socket_userid, function(data) {
-            if (data.balance > 0) {
-                if ((Math.floor(Date.now() / 1000)) - balance_last_changed > 2) {
-                    $('#balance').html(parseFloat(data.balance / 100000000).toFixed(8));
-                    balanceChanged();
-                }
-            }
-            if (data.lottery_tickets >= 0) {
-                $('#user_lottery_tickets').html(ReplaceNumberWithCommas(data.lottery_tickets));
-            }
-            if (data.reward_points >= 0) {
-                $('.user_reward_points').html(ReplaceNumberWithCommas(data.reward_points));
-            }
-            if (data.unconf_tx.length > 0 && hide_pending_deposits == 0) {
-                $('#unconfirmed_deposits_table').show();
-                $('#unconfirmed_deposits_table_rows').html('');
-                var mobile_class = "";
-                if (mobile_device == 1) {
-                    mobile_class = "lottery_table_mobile_style";
-                }
-                for (var i = 0; i < data.unconf_tx.length; i++) {
-                    var tx_hash = data.unconf_tx[i].tx_hash.substring(0, 12) + "..." + data.unconf_tx[i].tx_hash.substring(data.unconf_tx[i].tx_hash.length - 12);
-                    if (mobile_device == 1) {
-                        tx_hash = data.unconf_tx[i].tx_hash.substring(0, 10) + "..." + data.unconf_tx[i].tx_hash.substring(data.unconf_tx[i].tx_hash.length - 10);
+    if (socket_userid > 0) {
+        $.get('/stats_new_private/?u=' + socket_userid + '&p=' + socket_password + '&f=user_stats', function(data) {
+            if (data.status == "success") {
+                var user_lottery_tickets = parseInt(data.lottery_tickets);
+                var user_reward_points = parseInt(data.user_extras.reward_points);
+                var user_balance = parseInt(data.user.balance);
+                if (user_balance > 0) {
+                    if ((Math.floor(Date.now() / 1000)) - balance_last_changed > 30) {
+                        $('#balance').html(parseFloat(user_balance / 100000000).toFixed(8));
+                        $("#earn_btc_acc_balance").val($('#balance').html());
+                        $("#earn_btc_acc_balance").keyup();
+                        balanceChanged();
                     }
-                    var amount = parseFloat(data.unconf_tx[i].amount / 100000000).toFixed(8);
-                    $('#unconfirmed_deposits_table_rows').append('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-8 small-8 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '"><a href="https://www.blocktrail.com/BTC/tx/' + data.unconf_tx[i].tx_hash + '" target=_blank>' + tx_hash + '</a></div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '">' + amount + '</div></div></div>');
                 }
-            } else {
-                $('#unconfirmed_deposits_table').hide();
-            }
-            var show_payout_table = 0;
-            if (data.instant_payment_requests.length > 0 && hide_pending_payments == 0) {
-                show_payout_table = 1;
-                $('#instant_pending_payout_table').show();
-                $('#instant_pending_payout_table').html('');
-                var mobile_class = "";
-                if (mobile_device == 1) {
-                    mobile_class = "lottery_table_mobile_style";
+                if (user_lottery_tickets >= 0) {
+                    $('#user_lottery_tickets').html(ReplaceNumberWithCommas(user_lottery_tickets));
                 }
-                $('#instant_pending_payout_table').append('<div class="large-12 small-12 columns center lottery_winner_table_box"><div class="center bold" style="margin:auto;">INSTANT</div></div>');
-                for (var i = 0; i < data.instant_payment_requests.length; i++) {
-                    var amount = parseFloat(data.instant_payment_requests[i].amount / 100000000).toFixed(8);
-                    var btc_address = data.instant_payment_requests[i].btc_address;
+                if (user_reward_points >= 0) {
+                    $('.user_reward_points').html(ReplaceNumberWithCommas(user_reward_points));
+                }
+                if (data.unconf_tx.length > 0 && hide_pending_deposits == 0) {
+                    $('#unconfirmed_deposits_table').show();
+                    $('#unconfirmed_deposits_table_rows').html('');
+                    var mobile_class = "";
                     if (mobile_device == 1) {
-                        btc_address = data.instant_payment_requests[i].btc_address.substring(0, 10) + "..." + data.instant_payment_requests[i].btc_address.substring(data.instant_payment_requests[i].btc_address.length - 10);
+                        mobile_class = "lottery_table_mobile_style";
                     }
-                    $('#instant_pending_payout_table').append('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-8 small-8 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '"><a href="https://www.blocktrail.com/BTC/address/' + data.instant_payment_requests[i].btc_address + '" target=_blank>' + btc_address + '</a></div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '">' + amount + '</div></div>');
+                    for (var i = 0; i < data.unconf_tx.length; i++) {
+                        var tx_hash = data.unconf_tx[i].tx_hash.substring(0, 12) + "..." + data.unconf_tx[i].tx_hash.substring(data.unconf_tx[i].tx_hash.length - 12);
+                        if (mobile_device == 1) {
+                            tx_hash = data.unconf_tx[i].tx_hash.substring(0, 10) + "..." + data.unconf_tx[i].tx_hash.substring(data.unconf_tx[i].tx_hash.length - 10);
+                        }
+                        var amount = parseFloat(data.unconf_tx[i].amount / 100000000).toFixed(8);
+                        $('#unconfirmed_deposits_table_rows').append('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-8 small-8 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '"><a href="https://www.blocktrail.com/BTC/tx/' + data.unconf_tx[i].tx_hash + '" target=_blank>' + tx_hash + '</a></div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '">' + amount + '</div></div></div>');
+                    }
+                } else {
+                    $('#unconfirmed_deposits_table').hide();
                 }
-            } else {
-                $('#instant_pending_payout_table').hide();
-            }
-            if (data.manual_payment_requests.length > 0 && hide_pending_payments == 0) {
-                show_payout_table = 1;
-                $('#pending_payout_table').show();
-                $('#pending_payout_table').html('');
-                var mobile_class = "";
-                if (mobile_device == 1) {
-                    mobile_class = "lottery_table_mobile_style";
-                }
-                $('#pending_payout_table').append('<div class="large-12 small-12 columns center lottery_winner_table_box"><div class="center bold" style="margin:auto;">SLOW</div></div>');
-                for (var i = 0; i < data.manual_payment_requests.length; i++) {
-                    var amount = parseFloat(data.manual_payment_requests[i].amount / 100000000).toFixed(8);
-                    var btc_address = data.manual_payment_requests[i].btc_address;
+                var show_payout_table = 0;
+                if (data.instant_payment_requests.length > 0 && hide_pending_payments == 0) {
+                    show_payout_table = 1;
+                    $('#instant_pending_payout_table').show();
+                    $('#instant_pending_payout_table').html('');
+                    var mobile_class = "";
                     if (mobile_device == 1) {
-                        btc_address = data.manual_payment_requests[i].btc_address.substring(0, 10) + "..." + data.manual_payment_requests[i].btc_address.substring(data.manual_payment_requests[i].btc_address.length - 10);
+                        mobile_class = "lottery_table_mobile_style";
                     }
-                    $('#pending_payout_table').append('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-8 small-8 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '"><a href="https://www.blocktrail.com/BTC/address/' + data.manual_payment_requests[i].btc_address + '" target=_blank>' + btc_address + '</a></div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '">' + amount + '</div></div>');
+                    $('#instant_pending_payout_table').append('<div class="large-12 small-12 columns center lottery_winner_table_box"><div class="center bold" style="margin:auto;">INSTANT</div></div>');
+                    for (var i = 0; i < data.instant_payment_requests.length; i++) {
+                        var amount = parseFloat(data.instant_payment_requests[i].amount / 100000000).toFixed(8);
+                        var btc_address = data.instant_payment_requests[i].btc_address;
+                        if (mobile_device == 1) {
+                            btc_address = data.instant_payment_requests[i].btc_address.substring(0, 10) + "..." + data.instant_payment_requests[i].btc_address.substring(data.instant_payment_requests[i].btc_address.length - 10);
+                        }
+                        $('#instant_pending_payout_table').append('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-8 small-8 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '"><a href="https://www.blocktrail.com/BTC/address/' + data.instant_payment_requests[i].btc_address + '" target=_blank>' + btc_address + '</a></div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '">' + amount + '</div></div>');
+                    }
+                } else {
+                    $('#instant_pending_payout_table').hide();
                 }
-            } else {
-                $('#pending_payout_table').hide();
-            }
-            if (show_payout_table == 1) {
-                $('#pending_payouts_table_new').show();
-            } else {
-                $('#pending_payouts_table_new').hide();
+                if (data.manual_payment_requests.length > 0 && hide_pending_payments == 0) {
+                    show_payout_table = 1;
+                    $('#pending_payout_table').show();
+                    $('#pending_payout_table').html('');
+                    var mobile_class = "";
+                    if (mobile_device == 1) {
+                        mobile_class = "lottery_table_mobile_style";
+                    }
+                    $('#pending_payout_table').append('<div class="large-12 small-12 columns center lottery_winner_table_box"><div class="center bold" style="margin:auto;">SLOW</div></div>');
+                    for (var i = 0; i < data.manual_payment_requests.length; i++) {
+                        var amount = parseFloat(data.manual_payment_requests[i].amount / 100000000).toFixed(8);
+                        var btc_address = data.manual_payment_requests[i].btc_address;
+                        if (mobile_device == 1) {
+                            btc_address = data.manual_payment_requests[i].btc_address.substring(0, 10) + "..." + data.manual_payment_requests[i].btc_address.substring(data.manual_payment_requests[i].btc_address.length - 10);
+                        }
+                        $('#pending_payout_table').append('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-8 small-8 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '"><a href="https://www.blocktrail.com/BTC/address/' + data.manual_payment_requests[i].btc_address + '" target=_blank>' + btc_address + '</a></div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell ' + mobile_class + '">' + amount + '</div></div>');
+                    }
+                } else {
+                    $('#pending_payout_table').hide();
+                }
+                if (show_payout_table == 1) {
+                    $('#pending_payouts_table_new').show();
+                } else {
+                    $('#pending_payouts_table_new').hide();
+                }
+                if (parseInt(data.unblock_gbr.lottery_to_unblock) > 0 && parseFloat(data.unblock_gbr.deposit_to_unblock) > 0 && parseFloat(data.unblock_gbr.jackpot_to_unblock) > 0 && parseFloat(data.unblock_gbr.wager_to_unblock) > 0) {
+                    $('#req_for_bonuses_link').show();
+                    $('#unblock_modal_rp_bonuses_container').show();
+                    $('#unblock_modal_rp_bonuses').html('<p>To play FREE BTC using a VPN/proxy, to be able to redeem all reward point bonuses and to get an alternative to recaptcha:</p><div class="bold center account_unblock_options_box" id="option_container_play_multiply"><p class="bold">Purchase <span class="account_unblock_span option_play_multiply_span">' + ReplaceNumberWithCommas(data.unblock_gbr.lottery_to_unblock) + '</span> lottery tickets</p></div><h5 style="text-align: center;">OR</h5><div class="bold center account_unblock_options_box" id="option_container_deposit"><p class="bold">Wager <span class="account_unblock_span option_deposit_span">' + data.unblock_gbr.jackpot_to_unblock + ' BTC</span> in MULTIPLY BTC jackpots</p></div><h5 style="text-align: center;">OR</h5><div class="bold center account_unblock_options_box" id="option_container_buy_lottery"><p class="bold">Wager <span class="account_unblock_span option_buy_lottery_span">' + data.unblock_gbr.wager_to_unblock + ' BTC</span> in MULTIPLY BTC</p></div><h5 style="text-align: center;">OR</h5><div class="bold center account_unblock_options_box" id="option_container_fp_bonus"><p class="bold">Deposit <span class="account_unblock_span option_fp_bonus_span">' + data.unblock_gbr.deposit_to_unblock + ' BTC</span> into your account to earn interest</p>');
+                } else {
+                    $('#unblock_modal_rp_bonuses_container').hide();
+                }
+                if (parseInt(data.no_captcha_gbr.lottery_to_unblock) > 0 && parseFloat(data.no_captcha_gbr.deposit_to_unblock) > 0 && parseFloat(data.no_captcha_gbr.jackpot_to_unblock) > 0 && parseFloat(data.no_captcha_gbr.wager_to_unblock) > 0) {
+                    $('#req_for_bonuses_link').show();
+                    $('#unblock_modal_no_captcha_container').show();
+                    $('#unblock_modal_no_captcha').html('<p>To play FREE BTC without having to solve a captcha:</p><div class="bold center account_unblock_options_box" id="option_container_play_multiply"><p class="bold">Purchase <span class="account_unblock_span option_play_multiply_span">' + ReplaceNumberWithCommas(data.no_captcha_gbr.lottery_to_unblock) + '</span> lottery tickets</p></div><h5 style="text-align: center;">OR</h5><div class="bold center account_unblock_options_box" id="option_container_deposit"><p class="bold">Wager <span class="account_unblock_span option_deposit_span">' + data.no_captcha_gbr.jackpot_to_unblock + ' BTC</span> in MULTIPLY BTC jackpots</p></div><h5 style="text-align: center;">OR</h5><div class="bold center account_unblock_options_box" id="option_container_buy_lottery"><p class="bold">Wager <span class="account_unblock_span option_buy_lottery_span">' + data.no_captcha_gbr.wager_to_unblock + ' BTC</span> in MULTIPLY BTC</p></div><h5 style="text-align: center;">OR</h5><div class="bold center account_unblock_options_box" id="option_container_fp_bonus"><p class="bold">Deposit <span class="account_unblock_span option_fp_bonus_span">' + data.no_captcha_gbr.deposit_to_unblock + ' BTC</span> into your account to earn interest</p>');
+                } else {
+                    $('#unblock_modal_no_captcha_container').hide();
+                }
+                if (typeof data.wager_contest.wager_personal !== "undefined") {
+                    $('#personal_wager_for_contest').html(parseFloat(data.wager_contest.wager_personal / 100000000).toFixed(8));
+                }
+                if (typeof data.wager_contest.ref_contest_personal !== "undefined") {
+                    $('#ref_wager_for_contest').html(parseFloat(data.wager_contest.ref_contest_personal / 100000000).toFixed(8));
+                }
             }
         });
-    });
+        setTimeout(UpdateUserStats, 35000);
+    }
 }
 
 function ReplaceNumberWithCommas(yourNumber) {
@@ -2965,7 +3010,7 @@ function ReplaceNumberWithCommas(yourNumber) {
 
 function CalculateWinAmount() {
     $(".gt").html(parseInt(Math.round(10000 - (9500 / parseFloat($("#double_your_btc_payout_multiplier").val()).toFixed(2)))));
-    $(".lt").html(parseInt(Math.round((9500 / parseFloat($("#double_your_btc_payout_multiplier").val()).toFixed(2))))); /*var win_amount = 0;if ($( "#double_your_btc_stake" ).val()*100000000 > 999){win_amount = Math.round(($( "#double_your_btc_stake" ).val()*((parseFloat(9500/parseInt($( ".lt" ).html())).toFixed(2)) - 1))*100000000);}else{win_amount = Math.floor(($( "#double_your_btc_stake" ).val()*((parseFloat(9500/parseInt($( ".lt" ).html())).toFixed(2)) - 1))*100000000);}*/
+    $(".lt").html(parseInt(Math.round((9500 / parseFloat($("#double_your_btc_payout_multiplier").val()).toFixed(2)))));
     var win_amount = Math.floor(($("#double_your_btc_stake").val() * ((parseFloat(9500 / parseInt($(".lt").html())).toFixed(2)) - 1)) * 100000000 + 1e-6);
     $("#win_amount").html(parseFloat(win_amount / 100000000).toFixed(8));
 }
@@ -3051,7 +3096,7 @@ function ScreeSizeCSSChanges() {
         $("#bet_hi_button").addClass('bet_hi_button_to_add_small');
         $("#bet_hi_button").removeClass('bet_hi_button_remove bet_hi_button_to_add');
         $("#bet_lo_button").addClass('bet_lo_button_to_add_small');
-        $("#bet_lo_button").removeClass('bet_lo_button_remove bet_lo_button_to_add'); /*$( "#main_content" ).addClass('large-8');$( "#main_content" ).removeClass('large-9 push-3');$( "#main_content_ad_left" ).addClass('large-4');$( "#main_content_ad_left" ).removeClass('large-3 pull-9');if (ad_left == 1){$( "#main_content" ).addClass('push-4');$( "#main_content_ad_left" ).addClass('pull-8');}*/
+        $("#bet_lo_button").removeClass('bet_lo_button_remove bet_lo_button_to_add');
         $('.change_size_css').addClass('large-12');
         $('.change_size_css').removeClass('large-7 large-10');
     }
@@ -3073,10 +3118,14 @@ function GetBetHistory(page) {
         bet_history_page = page;
         $("#newer_bet_history").attr("disabled", true);
         $("#older_bet_history").attr("disabled", true);
-        $.get('/cgi-bin/api.pl?op=get_bet_history&page=' + page, function(data) {
+        $.get('/stats_new_private/?u=' + socket_userid + '&p=' + socket_password + '&f=bet_history&page=' + page, function(data) {
             $('#bet_history_table_rows').html('');
             var result1 = data.split(";");
-            for (var i = result1.length - 2; i >= 0; i--) {
+            var loop_end = 0;
+            if (result1[0] == "success") {
+                loop_end = 1;
+            }
+            for (var i = result1.length - 2; i >= loop_end; i--) {
                 var result2 = result1[i].split(":");
                 result2[0] = result2[0].replace(/\./g, ":");
                 var time = formatDate(result2[0] + ' MST');
@@ -3154,7 +3203,7 @@ function SwitchPageTabs(tab_name) {
 }
 
 function insertBitcoinMore(div_name, position) {
-    document.getElementById(div_name).insertAdjacentHTML(position, '<p class="faq_question bold">What is Bitcoin?</p><div class="faq_answer"><p>Bitcoin is an innovative payment network and a new kind of money.</p><p>Bitcoin uses peer-to-peer technology to operate with no central authority or banks; managing transactions and the issuing of bitcoins is carried out collectively by the network. <b>Bitcoin is open-source; its design is public, nobody owns or controls Bitcoin and everyone can take part.</b> Through many of its unique properties, Bitcoin allows exciting uses that could not be covered by any previous payment system.</p></div><p class="faq_question bold">How does Bitcoin work?</p><div class="faq_answer"><p>From a user perspective, Bitcoin is nothing more than a mobile app or computer program that provides a personal Bitcoin wallet and allows a user to send and receive bitcoins with them. This is how Bitcoin works for most users.</p><p>Behind the scenes, the Bitcoin network is sharing a public ledger called the "block chain". This ledger contains every transaction ever processed, allowing a user&rsquo;s computer to verify the validity of each transaction. The authenticity of each transaction is protected by digital signatures corresponding to the sending addresses, allowing all users to have full control over sending bitcoins from their own Bitcoin addresses. In addition, anyone can process transactions using the computing power of specialized hardware and earn a reward in bitcoins for this service. This is often called "mining". To learn more about Bitcoin, you can consult the dedicated page and the original paper.</p></div><p class="faq_question bold">Who created Bitcoin?</p><div class="faq_answer"><p>Bitcoin is the first implementation of a concept called "cryptocurrency", which was first described in 1998 by Wei Dai on the cypherpunks mailing list, suggesting the idea of a new form of money that uses cryptography to control its creation and transactions, rather than a central authority. The first Bitcoin specification and proof of concept was published in 2009 in a cryptography mailing list by Satoshi Nakamoto. Satoshi left the project in late 2010 without revealing much about himself. The community has since grown exponentially with many developers working on Bitcoin.</p><p>Satoshi&rsquo;s anonymity often raised unjustified concerns, many of which are linked to misunderstanding of the open-source nature of Bitcoin. The Bitcoin protocol and software are published openly and any developer around the world can review the code or make their own modified version of the Bitcoin software. Just like current developers, Satoshi&rsquo;s influence was limited to the changes he made being adopted by others and therefore he did not control Bitcoin. As such, the identity of Bitcoin&rsquo;s inventor is probably as relevant today as the identity of the person who invented paper.</p></div><p class="faq_question bold">Who controls the Bitcoin network?</p><div class="faq_answer"><p>Nobody owns the Bitcoin network much like no one owns the technology behind email. Bitcoin is controlled by all Bitcoin users around the world. While developers are improving the software, they can&rsquo;t force a change in the Bitcoin protocol because all users are free to choose what software and version they use. In order to stay compatible with each other, all users need to use software complying with the same rules. Bitcoin can only work correctly with a complete consensus among all users. Therefore, all users and developers have a strong incentive to protect this consensus.</p></div><p class="faq_question bold">Is Bitcoin really used by people?</p><div class="faq_answer"><p>Yes. There is a growing number of businesses and individuals using Bitcoin. This includes brick and mortar businesses like restaurants, apartments, law firms, and popular online services such as Namecheap, WordPress, and Reddit. While Bitcoin remains a relatively new phenomenon, it is growing fast. At the end of August 2013, the value of all bitcoins in circulation exceeded US$ 1.5 billion with millions of dollars worth of bitcoins exchanged daily.</p></div><p class="faq_question bold">How does one acquire bitcoins?</p><div class="faq_answer"><p><ul style="text-align:left;"><li>As payment for goods or services.</li><li>Purchase bitcoins at a Bitcoin exchange.</li><li>Exchange bitcoins with someone near you.</li><li>Earn bitcoins through competitive mining.</li></ul></p><p>While it may be possible to find individuals who wish to sell bitcoins in exchange for a credit card or PayPal payment, most exchanges do not allow funding via these payment methods. This is due to cases where someone buys bitcoins with PayPal, and then reverses their half of the transaction. This is commonly referred to as a chargeback.</p></div><p class="faq_question bold">How difficult is it to make a Bitcoin payment?</p><div class="faq_answer"><p>Bitcoin payments are easier to make than debit or credit card purchases, and can be received without a merchant account. Payments are made from a wallet application, either on your computer or smartphone, by entering the recipient&rsquo;s address, the payment amount, and pressing send. To make it easier to enter a recipient&rsquo;s address, many wallets can obtain the address by scanning a QR code or touching two phones together with NFC technology.</p></div><p class="faq_question bold">What are the advantages of Bitcoin?</p><div class="faq_answer"><p><ul style="text-align:left;"><li>Payment freedom - It is possible to send and receive any amount of money instantly anywhere in the world at any time. No bank holidays. No borders. No imposed limits. Bitcoin allows its users to be in full control of their money.</li><li>Very low fees - Bitcoin payments are currently processed with either no fees or extremely small fees. Users may include fees with transactions to receive priority processing, which results in faster confirmation of transactions by the network. Additionally, merchant processors exist to assist merchants in processing transactions, converting bitcoins to fiat currency and depositing funds directly into merchants&rsquo; bank accounts daily. As these services are based on Bitcoin, they can be offered for much lower fees than with PayPal or credit card networks.</li><li>Fewer risks for merchants - Bitcoin transactions are secure, irreversible, and do not contain customersâ€™ sensitive or personal information. This protects merchants from losses caused by fraud or fraudulent chargebacks, and there is no need for PCI compliance. Merchants can easily expand to new markets where either credit cards are not available or fraud rates are unacceptably high. The net results are lower fees, larger markets, and fewer administrative costs.</li><li>Security and control - Bitcoin users are in full control of their transactions; it is impossible for merchants to force unwanted or unnoticed charges as can happen with other payment methods. Bitcoin payments can be made without personal information tied to the transaction. This offers strong protection against identity theft. Bitcoin users can also protect their money with backup and encryption.</li><li>Transparent and neutral - All information concerning the Bitcoin money supply itself is readily available on the block chain for anybody to verify and use in real-time. No individual or organization can control or manipulate the Bitcoin protocol because it is cryptographically secure. This allows the core of Bitcoin to be trusted for being completely neutral, transparent and predictable.</li></ul></p></div><p class="faq_question bold">What are the disadvantages of Bitcoin?</p><div class="faq_answer"><p><ul style="text-align:left;"><li>Degree of acceptance - Many people are still unaware of Bitcoin. Every day, more businesses accept bitcoins because they want the advantages of doing so, but the list remains small and still needs to grow in order to benefit from network effects.</li><li>Volatility - The total value of bitcoins in circulation and the number of businesses using Bitcoin are still very small compared to what they could be. Therefore, relatively small events, trades, or business activities can significantly affect the price. In theory, this volatility will decrease as Bitcoin markets and the technology matures. Never before has the world seen a start-up currency, so it is truly difficult (and exciting) to imagine how it will play out.</li><li>Ongoing development - Bitcoin software is still in beta with many incomplete features in active development. New tools, features, and services are being developed to make Bitcoin more secure and accessible to the masses. Some of these are still not ready for everyone. Most Bitcoin businesses are new and still offer no insurance. In general, Bitcoin is still in the process of maturing.</li></ul></p></div><p class="faq_question bold">Why do people trust Bitcoin?</p><div class="faq_answer"><p>Much of the trust in Bitcoin comes from the fact that it requires no trust at all. Bitcoin is fully open-source and decentralized. This means that anyone has access to the entire source code at any time. Any developer in the world can therefore verify exactly how Bitcoin works. All transactions and bitcoins issued into existence can be transparently consulted in real-time by anyone. All payments can be made without reliance on a third party and the whole system is protected by heavily peer-reviewed cryptographic algorithms like those used for online banking. No organization or individual can control Bitcoin, and the network remains secure even if not all of its users can be trusted.</p></div><p class="faq_question bold">Can I make money with Bitcoin?</p><div class="faq_answer"><p>You should never expect to get rich with Bitcoin or any emerging technology. It is always important to be wary of anything that sounds too good to be true or disobeys basic economic rules.</p><p>Bitcoin is a growing space of innovation and there are business opportunities that also include risks. There is no guarantee that Bitcoin will continue to grow even though it has developed at a very fast rate so far. Investing time and resources on anything related to Bitcoin requires entrepreneurship. There are various ways to make money with Bitcoin such as mining, speculation or running new businesses. All of these methods are competitive and there is no guarantee of profit. It is up to each individual to make a proper evaluation of the costs and the risks involved in any such project.</p></div><p class="faq_question bold">Is Bitcoin fully virtual and immaterial?</p><div class="faq_answer"><p>Bitcoin is as virtual as the credit cards and online banking networks people use everyday. Bitcoin can be used to pay online and in physical stores just like any other form of money. Bitcoins can also be exchanged in physical form such as the Casascius coins, but paying with a mobile phone usually remains more convenient. Bitcoin balances are stored in a large distributed network, and they cannot be fraudulently altered by anybody. In other words, Bitcoin users have exclusive control over their funds and bitcoins cannot vanish just because they are virtual.</p></div><p class="faq_question bold">Is Bitcoin anonymous?</p><div class="faq_answer"><p>Bitcoin is designed to allow its users to send and receive payments with an acceptable level of privacy as well as any other form of money. However, Bitcoin is not anonymous and cannot offer the same level of privacy as cash. The use of Bitcoin leaves extensive public records. Various mechanisms exist to protect users&rsquo; privacy, and more are in development. However, there is still work to be done before these features are used correctly by most Bitcoin users.</p><p>Some concerns have been raised that private transactions could be used for illegal purposes with Bitcoin. However, it is worth noting that Bitcoin will undoubtedly be subjected to similar regulations that are already in place inside existing financial systems. Bitcoin cannot be more anonymous than cash and it is not likely to prevent criminal investigations from being conducted. Additionally, Bitcoin is also designed to prevent a large range of financial crimes.</p></div><p class="faq_question bold">What happens when bitcoins are lost?</p><div class="faq_answer"><p>When a user loses his wallet, it has the effect of removing money out of circulation. Lost bitcoins still remain in the block chain just like any other bitcoins. However, lost bitcoins remain dormant forever because there is no way for anybody to find the private key(s) that would allow them to be spent again. Because of the law of supply and demand, when fewer bitcoins are available, the ones that are left will be in higher demand and increase in value to compensate.</p></div><p class="faq_question bold">Can Bitcoin scale to become a major payment network?</p><div class="faq_answer"><p>The Bitcoin network can already process a much higher number of transactions per second than it does today. It is, however, not entirely ready to scale to the level of major credit card networks. Work is underway to lift current limitations, and future requirements are well known. Since inception, every aspect of the Bitcoin network has been in a continuous process of maturation, optimization, and specialization, and it should be expected to remain that way for some years to come. As traffic grows, more Bitcoin users may use lightweight clients, and full network nodes may become a more specialized service. For more details, see the Scalability page on the Wiki.</p></div><p class="faq_question bold">Is Bitcoin legal?</p><div class="faq_answer"><p>To the best of our knowledge, Bitcoin has not been made illegal by legislation in most jurisdictions. However, some jurisdictions (such as Argentina and Russia) severely restrict or ban foreign currencies. Other jurisdictions (such as Thailand) may limit the licensing of certain entities such as Bitcoin exchanges.</p><p>Regulators from various jurisdictions are taking steps to provide individuals and businesses with rules on how to integrate this new technology with the formal, regulated financial system. For example, the Financial Crimes Enforcement Network (FinCEN), a bureau in the United States Treasury Department, issued non-binding guidance on how it characterizes certain activities involving virtual currencies.</p></div><p class="faq_question bold">Is Bitcoin useful for illegal activities?</p><div class="faq_answer"><p>Bitcoin is money, and money has always been used both for legal and illegal purposes. Cash, credit cards and current banking systems widely surpass Bitcoin in terms of their use to finance crime. Bitcoin can bring significant innovation in payment systems and the benefits of such innovation are often considered to be far beyond their potential drawbacks.</p><p>Bitcoin is designed to be a huge step forward in making money more secure and could also act as a significant protection against many forms of financial crime. For instance, bitcoins are completely impossible to counterfeit. Users are in full control of their payments and cannot receive unapproved charges such as with credit card fraud. Bitcoin transactions are irreversible and immune to fraudulent chargebacks. Bitcoin allows money to be secured against theft and loss using very strong and useful mechanisms such as backups, encryption, and multiple signatures.</p><p>Some concerns have been raised that Bitcoin could be more attractive to criminals because it can be used to make private and irreversible payments. However, these features already exist with cash and wire transfer, which are widely used and well-established. The use of Bitcoin will undoubtedly be subjected to similar regulations that are already in place inside existing financial systems, and Bitcoin is not likely to prevent criminal investigations from being conducted. In general, it is common for important breakthroughs to be perceived as being controversial before their benefits are well understood. The Internet is a good example among many others to illustrate this.</p></div><p class="faq_question bold">Can Bitcoin be regulated?</p><div class="faq_answer"><p>The Bitcoin protocol itself cannot be modified without the cooperation of nearly all its users, who choose what software they use. Attempting to assign special rights to a local authority in the rules of the global Bitcoin network is not a practical possibility. Any rich organization could choose to invest in mining hardware to control half of the computing power of the network and become able to block or reverse recent transactions. However, there is no guarantee that they could retain this power since this requires to invest as much than all other miners in the world.</p><p>It is however possible to regulate the use of Bitcoin in a similar way to any other instrument. Just like the dollar, Bitcoin can be used for a wide variety of purposes, some of which can be considered legitimate or not as per each jurisdiction&rsquo;s laws. In this regard, Bitcoin is no different than any other tool or resource and can be subjected to different regulations in each country. Bitcoin use could also be made difficult by restrictive regulations, in which case it is hard to determine what percentage of users would keep using the technology. A government that chooses to ban Bitcoin would prevent domestic businesses and markets from developing, shifting innovation to other countries. The challenge for regulators, as always, is to develop efficient solutions while not impairing the growth of new emerging markets and businesses.</p></div><p class="faq_question bold">What about Bitcoin and taxes?</p><div class="faq_answer"><p>Bitcoin is not a fiat currency with legal tender status in any jurisdiction, but often tax liability accrues regardless of the medium used. There is a wide variety of legislation in many different jurisdictions which could cause income, sales, payroll, capital gains, or some other form of tax liability to arise with Bitcoin.</p></div><p class="faq_question bold">What about Bitcoin and consumer protection?</p><div class="faq_answer"><p>Bitcoin is freeing people to transact on their own terms. Each user can send and receive payments in a similar way to cash but they can also take part in more complex contracts. Multiple signatures allow a transaction to be accepted by the network only if a certain number of a defined group of persons agree to sign the transaction. This allows innovative dispute mediation services to be developed in the future. Such services could allow a third party to approve or reject a transaction in case of disagreement between the other parties without having control on their money. As opposed to cash and other payment methods, Bitcoin always leaves a public proof that a transaction did take place, which can potentially be used in a recourse against businesses with fraudulent practices.</p><p>It is also worth noting that while merchants usually depend on their public reputation to remain in business and pay their employees, they don&rsquo;t have access to the same level of information when dealing with new consumers. The way Bitcoin works allows both individuals and businesses to be protected against fraudulent chargebacks while giving the choice to the consumer to ask for more protection when they are not willing to trust a particular merchant.</p></div><p class="faq_question bold">How are bitcoins created?</p><div class="faq_answer"><p>New bitcoins are generated by a competitive and decentralized process called "mining". This process involves that individuals are rewarded by the network for their services. Bitcoin miners are processing transactions and securing the network using specialized hardware and are collecting new bitcoins in exchange.</p><p>The Bitcoin protocol is designed in such a way that new bitcoins are created at a fixed rate. This makes Bitcoin mining a very competitive business. When more miners join the network, it becomes increasingly difficult to make a profit and miners must seek efficiency to cut their operating costs. No central authority or developer has any power to control or manipulate the system to increase their profits. Every Bitcoin node in the world will reject anything that does not comply with the rules it expects the system to follow.</p><p>Bitcoins are created at a decreasing and predictable rate. The number of new bitcoins created each year is automatically halved over time until bitcoin issuance halts completely with a total of 21 million bitcoins in existence. At this point, Bitcoin miners will probably be supported exclusively by numerous small transaction fees.</p></div><p class="faq_question bold">Why do bitcoins have value?</p><div class="faq_answer"><p>Bitcoins have value because they are useful as a form of money. Bitcoin has the characteristics of money (durability, portability, fungibility, scarcity, divisibility, and recognizability) based on the properties of mathematics rather than relying on physical properties (like gold and silver) or trust in central authorities (like fiat currencies). In short, Bitcoin is backed by mathematics. With these attributes, all that is required for a form of money to hold value is trust and adoption. In the case of Bitcoin, this can be measured by its growing base of users, merchants, and startups. As with all currency, bitcoin&rsquo;s value comes only and directly from people willing to accept them as payment.</p></div><p class="faq_question bold">What determines bitcoin&rsquo;s price?</p><div class="faq_answer"><p>The price of a bitcoin is determined by supply and demand. When demand for bitcoins increases, the price increases, and when demand falls, the price falls. There is only a limited number of bitcoins in circulation and new bitcoins are created at a predictable and decreasing rate, which means that demand must follow this level of inflation to keep the price stable. Because Bitcoin is still a relatively small market compared to what it could be, it doesn&rsquo;t take significant amounts of money to move the market price up or down, and thus the price of a bitcoin is still very volatile.</p></div><p class="faq_question bold">Can bitcoins become worthless?</p><div class="faq_answer"><p>Yes. History is littered with currencies that failed and are no longer used, such as the German Mark during the Weimar Republic and, more recently, the Zimbabwean dollar. Although previous currency failures were typically due to hyperinflation of a kind that Bitcoin makes impossible, there is always potential for technical failures, competing currencies, political issues and so on. As a basic rule of thumb, no currency should be considered absolutely safe from failures or hard times. Bitcoin has proven reliable for years since its inception and there is a lot of potential for Bitcoin to continue to grow. However, no one is in a position to predict what the future will be for Bitcoin.</p></div><p class="faq_question bold">Is Bitcoin a bubble?</p><div class="faq_answer"><p>A fast rise in price does not constitute a bubble. An artificial over-valuation that will lead to a sudden downward correction constitutes a bubble. Choices based on individual human action by hundreds of thousands of market participants is the cause for bitcoin&rsquo;s price to fluctuate as the market seeks price discovery. Reasons for changes in sentiment may include a loss of confidence in Bitcoin, a large difference between value and price not based on the fundamentals of the Bitcoin economy, increased press coverage stimulating speculative demand, fear of uncertainty, and old-fashioned irrational exuberance and greed.</p></div><p class="faq_question bold">Is Bitcoin a Ponzi scheme?</p><div class="faq_answer"><p>A Ponzi scheme is a fraudulent investment operation that pays returns to its investors from their own money, or the money paid by subsequent investors, instead of from profit earned by the individuals running the business. Ponzi schemes are designed to collapse at the expense of the last investors when there is not enough new participants.</p><p>Bitcoin is a free software project with no central authority. Consequently, no one is in a position to make fraudulent representations about investment returns. Like other major currencies such as gold, United States dollar, euro, yen, etc. there is no guaranteed purchasing power and the exchange rate floats freely. This leads to volatility where owners of bitcoins can unpredictably make or lose money. Beyond speculation, Bitcoin is also a payment system with useful and competitive attributes that are being used by thousands of users and businesses.</p></div><p class="faq_question bold">Doesn&rsquo;t Bitcoin unfairly benefit early adopters?</p><div class="faq_answer"><p>Some early adopters have large numbers of bitcoins because they took risks and invested time and resources in an unproven technology that was hardly used by anyone and that was much harder to secure properly. Many early adopters spent large numbers of bitcoins quite a few times before they became valuable or bought only small amounts and didn&rsquo;t make huge gains. There is no guarantee that the price of a bitcoin will increase or drop. This is very similar to investing in an early startup that can either gain value through its usefulness and popularity, or just never break through. Bitcoin is still in its infancy, and it has been designed with a very long-term view; it is hard to imagine how it could be less biased towards early adopters, and today&rsquo;s users may or may not be the early adopters of tomorrow.</p></div><p class="faq_question bold">Won&rsquo;t the finite amount of bitcoins be a limitation?</p><div class="faq_answer"><p>Bitcoin is unique in that only 21 million bitcoins will ever be created. However, this will never be a limitation because transactions can be denominated in smaller sub-units of a bitcoin, such as bits - there are 1,000,000 bits in 1 bitcoin. Bitcoins can be divided up to 8 decimal places (0.000 000 01) and potentially even smaller units if that is ever required in the future as the average transaction size decreases.</p></div><p class="faq_question bold">Won&rsquo;t Bitcoin fall in a deflationary spiral?</p><div class="faq_answer"><p>The deflationary spiral theory says that if prices are expected to fall, people will move purchases into the future in order to benefit from the lower prices. That fall in demand will in turn cause merchants to lower their prices to try and stimulate demand, making the problem worse and leading to an economic depression.</p><p>Although this theory is a popular way to justify inflation amongst central bankers, it does not appear to always hold true and is considered controversial amongst economists. Consumer electronics is one example of a market where prices constantly fall but which is not in depression. Similarly, the value of bitcoins has risen over time and yet the size of the Bitcoin economy has also grown dramatically along with it. Because both the value of the currency and the size of its economy started at zero in 2009, Bitcoin is a counterexample to the theory showing that it must sometimes be wrong.</p><p>Notwithstanding this, Bitcoin is not designed to be a deflationary currency. It is more accurate to say Bitcoin is intended to inflate in its early years, and become stable in its later years. The only time the quantity of bitcoins in circulation will drop is if people carelessly lose their wallets by failing to make backups. With a stable monetary base and a stable economy, the value of the currency should remain the same.</p></div><p class="faq_question bold">Isn&rsquo;t speculation and volatility a problem for Bitcoin?</p><div class="faq_answer"><p>This is a chicken and egg situation. For bitcoin&rsquo;s price to stabilize, a large scale economy needs to develop with more businesses and users. For a large scale economy to develop, businesses and users will seek for price stability.</p><p>Fortunately, volatility does not affect the main benefits of Bitcoin as a payment system to transfer money from point A to point B. It is possible for businesses to convert bitcoin payments to their local currency instantly, allowing them to profit from the advantages of Bitcoin without being subjected to price fluctuations. Since Bitcoin offers many useful and unique features and properties, many users choose to use Bitcoin. With such solutions and incentives, it is possible that Bitcoin will mature and develop to a degree where price volatility will become limited.</p></div><p class="faq_question bold">What if someone bought up all the existing bitcoins?</p><div class="faq_answer"><p>Only a fraction of bitcoins issued to date are found on the exchange markets for sale. Bitcoin markets are competitive, meaning the price of a bitcoin will rise or fall depending on supply and demand. Additionally, new bitcoins will continue to be issued for decades to come. Therefore even the most determined buyer could not buy all the bitcoins in existence. This situation isn&rsquo;t to suggest, however, that the markets aren&rsquo;t vulnerable to price manipulation; it still doesn&rsquo;t take significant amounts of money to move the market price up or down, and thus Bitcoin remains a volatile asset thus far.</p></div><p class="faq_question bold">What if someone creates a better digital currency?</p><div class="faq_answer"><p>That can happen. For now, Bitcoin remains by far the most popular decentralized virtual currency, but there can be no guarantee that it will retain that position. There is already a set of alternative currencies inspired by Bitcoin. It is however probably correct to assume that significant improvements would be required for a new currency to overtake Bitcoin in terms of established market, even though this remains unpredictable. Bitcoin could also conceivably adopt improvements of a competing currency so long as it doesn&rsquo;t change fundamental parts of the protocol.</p></div><p class="faq_question bold">What is Bitcoin mining?</p><div class="faq_answer"><p>Mining is the process of spending computing power to process transactions, secure the network, and keep everyone in the system synchronized together. It can be perceived like the Bitcoin data center except that it has been designed to be fully decentralized with miners operating in all countries and no individual having control over the network. This process is referred to as "mining" as an analogy to gold mining because it is also a temporary mechanism used to issue new bitcoins. Unlike gold mining, however, Bitcoin mining provides a reward in exchange for useful services required to operate a secure payment network. Mining will still be required after the last bitcoin is issued.</p></div><p class="faq_question bold">How does Bitcoin mining work?</p><div class="faq_answer"><p>Anybody can become a Bitcoin miner by running software with specialized hardware. Mining software listens for transactions broadcast through the peer-to-peer network and performs appropriate tasks to process and confirm these transactions. Bitcoin miners perform this work because they can earn transaction fees paid by users for faster transaction processing, and newly created bitcoins issued into existence according to a fixed formula.</p><p>For new transactions to be confirmed, they need to be included in a block along with a mathematical proof of work. Such proofs are very hard to generate because there is no way to create them other than by trying billions of calculations per second. This requires miners to perform these calculations before their blocks are accepted by the network and before they are rewarded. As more people start to mine, the difficulty of finding valid blocks is automatically increased by the network to ensure that the average time to find a block remains equal to 10 minutes. As a result, mining is a very competitive business where no individual miner can control what is included in the block chain.</p><p>The proof of work is also designed to depend on the previous block to force a chronological order in the block chain. This makes it exponentially difficult to reverse previous transactions because this requires the recalculation of the proofs of work of all the subsequent blocks. When two blocks are found at the same time, miners work on the first block they receive and switch to the longest chain of blocks as soon as the next block is found. This allows mining to secure and maintain a global consensus based on processing power.</p><p>Bitcoin miners are neither able to cheat by increasing their own reward nor process fraudulent transactions that could corrupt the Bitcoin network because all Bitcoin nodes would reject any block that contains invalid data as per the rules of the Bitcoin protocol. Consequently, the network remains secure even if not all Bitcoin miners can be trusted.</p></div><p class="faq_question bold">Isn&rsquo;t Bitcoin mining a waste of energy?</p><div class="faq_answer"><p>Spending energy to secure and operate a payment system is hardly a waste. Like any other payment service, the use of Bitcoin entails processing costs. Services necessary for the operation of currently widespread monetary systems, such as banks, credit cards, and armored vehicles, also use a lot of energy. Although unlike Bitcoin, their total energy consumption is not transparent and cannot be as easily measured.</p><p>Bitcoin mining has been designed to become more optimized over time with specialized hardware consuming less energy, and the operating costs of mining should continue to be proportional to demand. When Bitcoin mining becomes too competitive and less profitable, some miners choose to stop their activities. Furthermore, all energy expended mining is eventually transformed into heat, and the most profitable miners will be those who have put this heat to good use. An optimally efficient mining network is one that isn&rsquo;t actually consuming any extra energy. While this is an ideal, the economics of mining are such that miners individually strive toward it.</p></div><p class="faq_question bold">How does mining help secure Bitcoin?</p><div class="faq_answer"><p>Mining creates the equivalent of a competitive lottery that makes it very difficult for anyone to consecutively add new blocks of transactions into the block chain. This protects the neutrality of the network by preventing any individual from gaining the power to block certain transactions. This also prevents any individual from replacing parts of the block chain to roll back their own spends, which could be used to defraud other users. Mining makes it exponentially more difficult to reverse a past transaction by requiring the rewriting of all blocks following this transaction.</p></div><p class="faq_question bold">What do I need to start mining?</p><div class="faq_answer"><p>In the early days of Bitcoin, anyone could find a new block using their computer&rsquo;s CPU. As more and more people started mining, the difficulty of finding new blocks increased greatly to the point where the only cost-effective method of mining today is using specialized hardware. You can visit BitcoinMining.com for more information.</p></div><p class="faq_question bold">Is Bitcoin secure?</p><div class="faq_answer"><p>The Bitcoin technology - the protocol and the cryptography - has a strong security track record, and the Bitcoin network is probably the biggest distributed computing project in the world. Bitcoin&rsquo;s most common vulnerability is in user error. Bitcoin wallet files that store the necessary private keys can be accidentally deleted, lost or stolen. This is pretty similar to physical cash stored in a digital form. Fortunately, users can employ sound security practices to protect their money or use service providers that offer good levels of security and insurance against theft or loss.</p></div><p class="faq_question bold">Hasn&rsquo;t Bitcoin been hacked in the past?</p><div class="faq_answer"><p>The rules of the protocol and the cryptography used for Bitcoin are still working years after its inception, which is a good indication that the concept is well designed. However, security flaws have been found and fixed over time in various software implementations. Like any other form of software, the security of Bitcoin software depends on the speed with which problems are found and fixed. The more such issues are discovered, the more Bitcoin is gaining maturity.</p><p>There are often misconceptions about thefts and security breaches that happened on diverse exchanges and businesses. Although these events are unfortunate, none of them involve Bitcoin itself being hacked, nor imply inherent flaws in Bitcoin; just like a bank robbery doesn&rsquo;t mean that the dollar is compromised. However, it is accurate to say that a complete set of good practices and intuitive security solutions is needed to give users better protection of their money, and to reduce the general risk of theft and loss. Over the course of the last few years, such security features have quickly developed, such as wallet encryption, offline wallets, hardware wallets, and multi-signature transactions.</p></div><p class="faq_question bold">Could users collude against Bitcoin?</p><div class="faq_answer"><p>It is not possible to change the Bitcoin protocol that easily. Any Bitcoin client that doesn&rsquo;t comply with the same rules cannot enforce their own rules on other users. As per the current specification, double spending is not possible on the same block chain, and neither is spending bitcoins without a valid signature. Therefore, It is not possible to generate uncontrolled amounts of bitcoins out of thin air, spend other users&rsquo; funds, corrupt the network, or anything similar.</p><p>However, powerful miners could arbitrarily choose to block or reverse recent transactions. A majority of users can also put pressure for some changes to be adopted. Because Bitcoin only works correctly with a complete consensus between all users, changing the protocol can be very difficult and requires an overwhelming majority of users to adopt the changes in such a way that remaining users have nearly no choice but to follow. As a general rule, it is hard to imagine why any Bitcoin user would choose to adopt any change that could compromise their own money.</p></div><p class="faq_question bold">Is Bitcoin vulnerable to quantum computing?</p><div class="faq_answer"><p>Yes, most systems relying on cryptography in general are, including traditional banking systems. However, quantum computers don&rsquo;t yet exist and probably won&rsquo;t for a while. In the event that quantum computing could be an imminent threat to Bitcoin, the protocol could be upgraded to use post-quantum algorithms. Given the importance that this update would have, it can be safely expected that it would be highly reviewed by developers and adopted by all Bitcoin users.</p></div><p class="faq_question bold">What if I have more questions about Bitcoin?</p><div class="faq_answer"><p>Three great places where you can get your questions answered are the BitcoinTalk Forum at <a href="http://bitcointalk.org" target="_blank">BitcoinTalk.org</a>, the Bitcoin sub-reddit at <a href="http://www.reddit.com/r/bitcoin" target="_blank">Reddit.com/r/bitcoin</a> and Bitcoin Stack Exchange at <a href="http://bitcoin.stackexchange.com/" target="_blank">Bitcoin.StackExchange.com</a>.</p></div>');
+    document.getElementById(div_name).insertAdjacentHTML(position, '<p class="faq_question bold">What is Bitcoin?</p><div class="faq_answer"><p>Bitcoin is an innovative payment network and a new kind of money.</p><p>Bitcoin uses peer-to-peer technology to operate with no central authority or banks; managing transactions and the issuing of bitcoins is carried out collectively by the network. <b>Bitcoin is open-source; its design is public, nobody owns or controls Bitcoin and everyone can take part.</b> Through many of its unique properties, Bitcoin allows exciting uses that could not be covered by any previous payment system.</p></div><p class="faq_question bold">How does Bitcoin work?</p><div class="faq_answer"><p>From a user perspective, Bitcoin is nothing more than a mobile app or computer program that provides a personal Bitcoin wallet and allows a user to send and receive bitcoins with them. This is how Bitcoin works for most users.</p><p>Behind the scenes, the Bitcoin network is sharing a public ledger called the "block chain". This ledger contains every transaction ever processed, allowing a user&rsquo;s computer to verify the validity of each transaction. The authenticity of each transaction is protected by digital signatures corresponding to the sending addresses, allowing all users to have full control over sending bitcoins from their own Bitcoin addresses. In addition, anyone can process transactions using the computing power of specialized hardware and earn a reward in bitcoins for this service. This is often called "mining". To learn more about Bitcoin, you can consult the dedicated page and the original paper.</p></div><p class="faq_question bold">Who created Bitcoin?</p><div class="faq_answer"><p>Bitcoin is the first implementation of a concept called "cryptocurrency", which was first described in 1998 by Wei Dai on the cypherpunks mailing list, suggesting the idea of a new form of money that uses cryptography to control its creation and transactions, rather than a central authority. The first Bitcoin specification and proof of concept was published in 2009 in a cryptography mailing list by Satoshi Nakamoto. Satoshi left the project in late 2010 without revealing much about himself. The community has since grown exponentially with many developers working on Bitcoin.</p><p>Satoshi&rsquo;s anonymity often raised unjustified concerns, many of which are linked to misunderstanding of the open-source nature of Bitcoin. The Bitcoin protocol and software are published openly and any developer around the world can review the code or make their own modified version of the Bitcoin software. Just like current developers, Satoshi&rsquo;s influence was limited to the changes he made being adopted by others and therefore he did not control Bitcoin. As such, the identity of Bitcoin&rsquo;s inventor is probably as relevant today as the identity of the person who invented paper.</p></div><p class="faq_question bold">Who controls the Bitcoin network?</p><div class="faq_answer"><p>Nobody owns the Bitcoin network much like no one owns the technology behind email. Bitcoin is controlled by all Bitcoin users around the world. While developers are improving the software, they can&rsquo;t force a change in the Bitcoin protocol because all users are free to choose what software and version they use. In order to stay compatible with each other, all users need to use software complying with the same rules. Bitcoin can only work correctly with a complete consensus among all users. Therefore, all users and developers have a strong incentive to protect this consensus.</p></div><p class="faq_question bold">Is Bitcoin really used by people?</p><div class="faq_answer"><p>Yes. There is a growing number of businesses and individuals using Bitcoin. This includes brick and mortar businesses like restaurants, apartments, law firms, and popular online services such as Namecheap, WordPress, and Reddit. While Bitcoin remains a relatively new phenomenon, it is growing fast. At the end of August 2013, the value of all bitcoins in circulation exceeded US$ 1.5 billion with millions of dollars worth of bitcoins exchanged daily.</p></div><p class="faq_question bold">How does one acquire bitcoins?</p><div class="faq_answer"><p><ul style="text-align:left;"><li>As payment for goods or services.</li><li>Purchase bitcoins at a Bitcoin exchange.</li><li>Exchange bitcoins with someone near you.</li><li>Earn bitcoins through competitive mining.</li></ul></p><p>While it may be possible to find individuals who wish to sell bitcoins in exchange for a credit card or PayPal payment, most exchanges do not allow funding via these payment methods. This is due to cases where someone buys bitcoins with PayPal, and then reverses their half of the transaction. This is commonly referred to as a chargeback.</p></div><p class="faq_question bold">How difficult is it to make a Bitcoin payment?</p><div class="faq_answer"><p>Bitcoin payments are easier to make than debit or credit card purchases, and can be received without a merchant account. Payments are made from a wallet application, either on your computer or smartphone, by entering the recipient&rsquo;s address, the payment amount, and pressing send. To make it easier to enter a recipient&rsquo;s address, many wallets can obtain the address by scanning a QR code or touching two phones together with NFC technology.</p></div><p class="faq_question bold">What are the advantages of Bitcoin?</p><div class="faq_answer"><p><ul style="text-align:left;"><li>Payment freedom - It is possible to send and receive any amount of money instantly anywhere in the world at any time. No bank holidays. No borders. No imposed limits. Bitcoin allows its users to be in full control of their money.</li><li>Very low fees - Bitcoin payments are currently processed with either no fees or extremely small fees. Users may include fees with transactions to receive priority processing, which results in faster confirmation of transactions by the network. Additionally, merchant processors exist to assist merchants in processing transactions, converting bitcoins to fiat currency and depositing funds directly into merchants&rsquo; bank accounts daily. As these services are based on Bitcoin, they can be offered for much lower fees than with PayPal or credit card networks.</li><li>Fewer risks for merchants - Bitcoin transactions are secure, irreversible, and do not contain customersÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ sensitive or personal information. This protects merchants from losses caused by fraud or fraudulent chargebacks, and there is no need for PCI compliance. Merchants can easily expand to new markets where either credit cards are not available or fraud rates are unacceptably high. The net results are lower fees, larger markets, and fewer administrative costs.</li><li>Security and control - Bitcoin users are in full control of their transactions; it is impossible for merchants to force unwanted or unnoticed charges as can happen with other payment methods. Bitcoin payments can be made without personal information tied to the transaction. This offers strong protection against identity theft. Bitcoin users can also protect their money with backup and encryption.</li><li>Transparent and neutral - All information concerning the Bitcoin money supply itself is readily available on the block chain for anybody to verify and use in real-time. No individual or organization can control or manipulate the Bitcoin protocol because it is cryptographically secure. This allows the core of Bitcoin to be trusted for being completely neutral, transparent and predictable.</li></ul></p></div><p class="faq_question bold">What are the disadvantages of Bitcoin?</p><div class="faq_answer"><p><ul style="text-align:left;"><li>Degree of acceptance - Many people are still unaware of Bitcoin. Every day, more businesses accept bitcoins because they want the advantages of doing so, but the list remains small and still needs to grow in order to benefit from network effects.</li><li>Volatility - The total value of bitcoins in circulation and the number of businesses using Bitcoin are still very small compared to what they could be. Therefore, relatively small events, trades, or business activities can significantly affect the price. In theory, this volatility will decrease as Bitcoin markets and the technology matures. Never before has the world seen a start-up currency, so it is truly difficult (and exciting) to imagine how it will play out.</li><li>Ongoing development - Bitcoin software is still in beta with many incomplete features in active development. New tools, features, and services are being developed to make Bitcoin more secure and accessible to the masses. Some of these are still not ready for everyone. Most Bitcoin businesses are new and still offer no insurance. In general, Bitcoin is still in the process of maturing.</li></ul></p></div><p class="faq_question bold">Why do people trust Bitcoin?</p><div class="faq_answer"><p>Much of the trust in Bitcoin comes from the fact that it requires no trust at all. Bitcoin is fully open-source and decentralized. This means that anyone has access to the entire source code at any time. Any developer in the world can therefore verify exactly how Bitcoin works. All transactions and bitcoins issued into existence can be transparently consulted in real-time by anyone. All payments can be made without reliance on a third party and the whole system is protected by heavily peer-reviewed cryptographic algorithms like those used for online banking. No organization or individual can control Bitcoin, and the network remains secure even if not all of its users can be trusted.</p></div><p class="faq_question bold">Can I make money with Bitcoin?</p><div class="faq_answer"><p>You should never expect to get rich with Bitcoin or any emerging technology. It is always important to be wary of anything that sounds too good to be true or disobeys basic economic rules.</p><p>Bitcoin is a growing space of innovation and there are business opportunities that also include risks. There is no guarantee that Bitcoin will continue to grow even though it has developed at a very fast rate so far. Investing time and resources on anything related to Bitcoin requires entrepreneurship. There are various ways to make money with Bitcoin such as mining, speculation or running new businesses. All of these methods are competitive and there is no guarantee of profit. It is up to each individual to make a proper evaluation of the costs and the risks involved in any such project.</p></div><p class="faq_question bold">Is Bitcoin fully virtual and immaterial?</p><div class="faq_answer"><p>Bitcoin is as virtual as the credit cards and online banking networks people use everyday. Bitcoin can be used to pay online and in physical stores just like any other form of money. Bitcoins can also be exchanged in physical form such as the Casascius coins, but paying with a mobile phone usually remains more convenient. Bitcoin balances are stored in a large distributed network, and they cannot be fraudulently altered by anybody. In other words, Bitcoin users have exclusive control over their funds and bitcoins cannot vanish just because they are virtual.</p></div><p class="faq_question bold">Is Bitcoin anonymous?</p><div class="faq_answer"><p>Bitcoin is designed to allow its users to send and receive payments with an acceptable level of privacy as well as any other form of money. However, Bitcoin is not anonymous and cannot offer the same level of privacy as cash. The use of Bitcoin leaves extensive public records. Various mechanisms exist to protect users&rsquo; privacy, and more are in development. However, there is still work to be done before these features are used correctly by most Bitcoin users.</p><p>Some concerns have been raised that private transactions could be used for illegal purposes with Bitcoin. However, it is worth noting that Bitcoin will undoubtedly be subjected to similar regulations that are already in place inside existing financial systems. Bitcoin cannot be more anonymous than cash and it is not likely to prevent criminal investigations from being conducted. Additionally, Bitcoin is also designed to prevent a large range of financial crimes.</p></div><p class="faq_question bold">What happens when bitcoins are lost?</p><div class="faq_answer"><p>When a user loses his wallet, it has the effect of removing money out of circulation. Lost bitcoins still remain in the block chain just like any other bitcoins. However, lost bitcoins remain dormant forever because there is no way for anybody to find the private key(s) that would allow them to be spent again. Because of the law of supply and demand, when fewer bitcoins are available, the ones that are left will be in higher demand and increase in value to compensate.</p></div><p class="faq_question bold">Can Bitcoin scale to become a major payment network?</p><div class="faq_answer"><p>The Bitcoin network can already process a much higher number of transactions per second than it does today. It is, however, not entirely ready to scale to the level of major credit card networks. Work is underway to lift current limitations, and future requirements are well known. Since inception, every aspect of the Bitcoin network has been in a continuous process of maturation, optimization, and specialization, and it should be expected to remain that way for some years to come. As traffic grows, more Bitcoin users may use lightweight clients, and full network nodes may become a more specialized service. For more details, see the Scalability page on the Wiki.</p></div><p class="faq_question bold">Is Bitcoin legal?</p><div class="faq_answer"><p>To the best of our knowledge, Bitcoin has not been made illegal by legislation in most jurisdictions. However, some jurisdictions (such as Argentina and Russia) severely restrict or ban foreign currencies. Other jurisdictions (such as Thailand) may limit the licensing of certain entities such as Bitcoin exchanges.</p><p>Regulators from various jurisdictions are taking steps to provide individuals and businesses with rules on how to integrate this new technology with the formal, regulated financial system. For example, the Financial Crimes Enforcement Network (FinCEN), a bureau in the United States Treasury Department, issued non-binding guidance on how it characterizes certain activities involving virtual currencies.</p></div><p class="faq_question bold">Is Bitcoin useful for illegal activities?</p><div class="faq_answer"><p>Bitcoin is money, and money has always been used both for legal and illegal purposes. Cash, credit cards and current banking systems widely surpass Bitcoin in terms of their use to finance crime. Bitcoin can bring significant innovation in payment systems and the benefits of such innovation are often considered to be far beyond their potential drawbacks.</p><p>Bitcoin is designed to be a huge step forward in making money more secure and could also act as a significant protection against many forms of financial crime. For instance, bitcoins are completely impossible to counterfeit. Users are in full control of their payments and cannot receive unapproved charges such as with credit card fraud. Bitcoin transactions are irreversible and immune to fraudulent chargebacks. Bitcoin allows money to be secured against theft and loss using very strong and useful mechanisms such as backups, encryption, and multiple signatures.</p><p>Some concerns have been raised that Bitcoin could be more attractive to criminals because it can be used to make private and irreversible payments. However, these features already exist with cash and wire transfer, which are widely used and well-established. The use of Bitcoin will undoubtedly be subjected to similar regulations that are already in place inside existing financial systems, and Bitcoin is not likely to prevent criminal investigations from being conducted. In general, it is common for important breakthroughs to be perceived as being controversial before their benefits are well understood. The Internet is a good example among many others to illustrate this.</p></div><p class="faq_question bold">Can Bitcoin be regulated?</p><div class="faq_answer"><p>The Bitcoin protocol itself cannot be modified without the cooperation of nearly all its users, who choose what software they use. Attempting to assign special rights to a local authority in the rules of the global Bitcoin network is not a practical possibility. Any rich organization could choose to invest in mining hardware to control half of the computing power of the network and become able to block or reverse recent transactions. However, there is no guarantee that they could retain this power since this requires to invest as much than all other miners in the world.</p><p>It is however possible to regulate the use of Bitcoin in a similar way to any other instrument. Just like the dollar, Bitcoin can be used for a wide variety of purposes, some of which can be considered legitimate or not as per each jurisdiction&rsquo;s laws. In this regard, Bitcoin is no different than any other tool or resource and can be subjected to different regulations in each country. Bitcoin use could also be made difficult by restrictive regulations, in which case it is hard to determine what percentage of users would keep using the technology. A government that chooses to ban Bitcoin would prevent domestic businesses and markets from developing, shifting innovation to other countries. The challenge for regulators, as always, is to develop efficient solutions while not impairing the growth of new emerging markets and businesses.</p></div><p class="faq_question bold">What about Bitcoin and taxes?</p><div class="faq_answer"><p>Bitcoin is not a fiat currency with legal tender status in any jurisdiction, but often tax liability accrues regardless of the medium used. There is a wide variety of legislation in many different jurisdictions which could cause income, sales, payroll, capital gains, or some other form of tax liability to arise with Bitcoin.</p></div><p class="faq_question bold">What about Bitcoin and consumer protection?</p><div class="faq_answer"><p>Bitcoin is freeing people to transact on their own terms. Each user can send and receive payments in a similar way to cash but they can also take part in more complex contracts. Multiple signatures allow a transaction to be accepted by the network only if a certain number of a defined group of persons agree to sign the transaction. This allows innovative dispute mediation services to be developed in the future. Such services could allow a third party to approve or reject a transaction in case of disagreement between the other parties without having control on their money. As opposed to cash and other payment methods, Bitcoin always leaves a public proof that a transaction did take place, which can potentially be used in a recourse against businesses with fraudulent practices.</p><p>It is also worth noting that while merchants usually depend on their public reputation to remain in business and pay their employees, they don&rsquo;t have access to the same level of information when dealing with new consumers. The way Bitcoin works allows both individuals and businesses to be protected against fraudulent chargebacks while giving the choice to the consumer to ask for more protection when they are not willing to trust a particular merchant.</p></div><p class="faq_question bold">How are bitcoins created?</p><div class="faq_answer"><p>New bitcoins are generated by a competitive and decentralized process called "mining". This process involves that individuals are rewarded by the network for their services. Bitcoin miners are processing transactions and securing the network using specialized hardware and are collecting new bitcoins in exchange.</p><p>The Bitcoin protocol is designed in such a way that new bitcoins are created at a fixed rate. This makes Bitcoin mining a very competitive business. When more miners join the network, it becomes increasingly difficult to make a profit and miners must seek efficiency to cut their operating costs. No central authority or developer has any power to control or manipulate the system to increase their profits. Every Bitcoin node in the world will reject anything that does not comply with the rules it expects the system to follow.</p><p>Bitcoins are created at a decreasing and predictable rate. The number of new bitcoins created each year is automatically halved over time until bitcoin issuance halts completely with a total of 21 million bitcoins in existence. At this point, Bitcoin miners will probably be supported exclusively by numerous small transaction fees.</p></div><p class="faq_question bold">Why do bitcoins have value?</p><div class="faq_answer"><p>Bitcoins have value because they are useful as a form of money. Bitcoin has the characteristics of money (durability, portability, fungibility, scarcity, divisibility, and recognizability) based on the properties of mathematics rather than relying on physical properties (like gold and silver) or trust in central authorities (like fiat currencies). In short, Bitcoin is backed by mathematics. With these attributes, all that is required for a form of money to hold value is trust and adoption. In the case of Bitcoin, this can be measured by its growing base of users, merchants, and startups. As with all currency, bitcoin&rsquo;s value comes only and directly from people willing to accept them as payment.</p></div><p class="faq_question bold">What determines bitcoin&rsquo;s price?</p><div class="faq_answer"><p>The price of a bitcoin is determined by supply and demand. When demand for bitcoins increases, the price increases, and when demand falls, the price falls. There is only a limited number of bitcoins in circulation and new bitcoins are created at a predictable and decreasing rate, which means that demand must follow this level of inflation to keep the price stable. Because Bitcoin is still a relatively small market compared to what it could be, it doesn&rsquo;t take significant amounts of money to move the market price up or down, and thus the price of a bitcoin is still very volatile.</p></div><p class="faq_question bold">Can bitcoins become worthless?</p><div class="faq_answer"><p>Yes. History is littered with currencies that failed and are no longer used, such as the German Mark during the Weimar Republic and, more recently, the Zimbabwean dollar. Although previous currency failures were typically due to hyperinflation of a kind that Bitcoin makes impossible, there is always potential for technical failures, competing currencies, political issues and so on. As a basic rule of thumb, no currency should be considered absolutely safe from failures or hard times. Bitcoin has proven reliable for years since its inception and there is a lot of potential for Bitcoin to continue to grow. However, no one is in a position to predict what the future will be for Bitcoin.</p></div><p class="faq_question bold">Is Bitcoin a bubble?</p><div class="faq_answer"><p>A fast rise in price does not constitute a bubble. An artificial over-valuation that will lead to a sudden downward correction constitutes a bubble. Choices based on individual human action by hundreds of thousands of market participants is the cause for bitcoin&rsquo;s price to fluctuate as the market seeks price discovery. Reasons for changes in sentiment may include a loss of confidence in Bitcoin, a large difference between value and price not based on the fundamentals of the Bitcoin economy, increased press coverage stimulating speculative demand, fear of uncertainty, and old-fashioned irrational exuberance and greed.</p></div><p class="faq_question bold">Is Bitcoin a Ponzi scheme?</p><div class="faq_answer"><p>A Ponzi scheme is a fraudulent investment operation that pays returns to its investors from their own money, or the money paid by subsequent investors, instead of from profit earned by the individuals running the business. Ponzi schemes are designed to collapse at the expense of the last investors when there is not enough new participants.</p><p>Bitcoin is a free software project with no central authority. Consequently, no one is in a position to make fraudulent representations about investment returns. Like other major currencies such as gold, United States dollar, euro, yen, etc. there is no guaranteed purchasing power and the exchange rate floats freely. This leads to volatility where owners of bitcoins can unpredictably make or lose money. Beyond speculation, Bitcoin is also a payment system with useful and competitive attributes that are being used by thousands of users and businesses.</p></div><p class="faq_question bold">Doesn&rsquo;t Bitcoin unfairly benefit early adopters?</p><div class="faq_answer"><p>Some early adopters have large numbers of bitcoins because they took risks and invested time and resources in an unproven technology that was hardly used by anyone and that was much harder to secure properly. Many early adopters spent large numbers of bitcoins quite a few times before they became valuable or bought only small amounts and didn&rsquo;t make huge gains. There is no guarantee that the price of a bitcoin will increase or drop. This is very similar to investing in an early startup that can either gain value through its usefulness and popularity, or just never break through. Bitcoin is still in its infancy, and it has been designed with a very long-term view; it is hard to imagine how it could be less biased towards early adopters, and today&rsquo;s users may or may not be the early adopters of tomorrow.</p></div><p class="faq_question bold">Won&rsquo;t the finite amount of bitcoins be a limitation?</p><div class="faq_answer"><p>Bitcoin is unique in that only 21 million bitcoins will ever be created. However, this will never be a limitation because transactions can be denominated in smaller sub-units of a bitcoin, such as bits - there are 1,000,000 bits in 1 bitcoin. Bitcoins can be divided up to 8 decimal places (0.000 000 01) and potentially even smaller units if that is ever required in the future as the average transaction size decreases.</p></div><p class="faq_question bold">Won&rsquo;t Bitcoin fall in a deflationary spiral?</p><div class="faq_answer"><p>The deflationary spiral theory says that if prices are expected to fall, people will move purchases into the future in order to benefit from the lower prices. That fall in demand will in turn cause merchants to lower their prices to try and stimulate demand, making the problem worse and leading to an economic depression.</p><p>Although this theory is a popular way to justify inflation amongst central bankers, it does not appear to always hold true and is considered controversial amongst economists. Consumer electronics is one example of a market where prices constantly fall but which is not in depression. Similarly, the value of bitcoins has risen over time and yet the size of the Bitcoin economy has also grown dramatically along with it. Because both the value of the currency and the size of its economy started at zero in 2009, Bitcoin is a counterexample to the theory showing that it must sometimes be wrong.</p><p>Notwithstanding this, Bitcoin is not designed to be a deflationary currency. It is more accurate to say Bitcoin is intended to inflate in its early years, and become stable in its later years. The only time the quantity of bitcoins in circulation will drop is if people carelessly lose their wallets by failing to make backups. With a stable monetary base and a stable economy, the value of the currency should remain the same.</p></div><p class="faq_question bold">Isn&rsquo;t speculation and volatility a problem for Bitcoin?</p><div class="faq_answer"><p>This is a chicken and egg situation. For bitcoin&rsquo;s price to stabilize, a large scale economy needs to develop with more businesses and users. For a large scale economy to develop, businesses and users will seek for price stability.</p><p>Fortunately, volatility does not affect the main benefits of Bitcoin as a payment system to transfer money from point A to point B. It is possible for businesses to convert bitcoin payments to their local currency instantly, allowing them to profit from the advantages of Bitcoin without being subjected to price fluctuations. Since Bitcoin offers many useful and unique features and properties, many users choose to use Bitcoin. With such solutions and incentives, it is possible that Bitcoin will mature and develop to a degree where price volatility will become limited.</p></div><p class="faq_question bold">What if someone bought up all the existing bitcoins?</p><div class="faq_answer"><p>Only a fraction of bitcoins issued to date are found on the exchange markets for sale. Bitcoin markets are competitive, meaning the price of a bitcoin will rise or fall depending on supply and demand. Additionally, new bitcoins will continue to be issued for decades to come. Therefore even the most determined buyer could not buy all the bitcoins in existence. This situation isn&rsquo;t to suggest, however, that the markets aren&rsquo;t vulnerable to price manipulation; it still doesn&rsquo;t take significant amounts of money to move the market price up or down, and thus Bitcoin remains a volatile asset thus far.</p></div><p class="faq_question bold">What if someone creates a better digital currency?</p><div class="faq_answer"><p>That can happen. For now, Bitcoin remains by far the most popular decentralized virtual currency, but there can be no guarantee that it will retain that position. There is already a set of alternative currencies inspired by Bitcoin. It is however probably correct to assume that significant improvements would be required for a new currency to overtake Bitcoin in terms of established market, even though this remains unpredictable. Bitcoin could also conceivably adopt improvements of a competing currency so long as it doesn&rsquo;t change fundamental parts of the protocol.</p></div><p class="faq_question bold">What is Bitcoin mining?</p><div class="faq_answer"><p>Mining is the process of spending computing power to process transactions, secure the network, and keep everyone in the system synchronized together. It can be perceived like the Bitcoin data center except that it has been designed to be fully decentralized with miners operating in all countries and no individual having control over the network. This process is referred to as "mining" as an analogy to gold mining because it is also a temporary mechanism used to issue new bitcoins. Unlike gold mining, however, Bitcoin mining provides a reward in exchange for useful services required to operate a secure payment network. Mining will still be required after the last bitcoin is issued.</p></div><p class="faq_question bold">How does Bitcoin mining work?</p><div class="faq_answer"><p>Anybody can become a Bitcoin miner by running software with specialized hardware. Mining software listens for transactions broadcast through the peer-to-peer network and performs appropriate tasks to process and confirm these transactions. Bitcoin miners perform this work because they can earn transaction fees paid by users for faster transaction processing, and newly created bitcoins issued into existence according to a fixed formula.</p><p>For new transactions to be confirmed, they need to be included in a block along with a mathematical proof of work. Such proofs are very hard to generate because there is no way to create them other than by trying billions of calculations per second. This requires miners to perform these calculations before their blocks are accepted by the network and before they are rewarded. As more people start to mine, the difficulty of finding valid blocks is automatically increased by the network to ensure that the average time to find a block remains equal to 10 minutes. As a result, mining is a very competitive business where no individual miner can control what is included in the block chain.</p><p>The proof of work is also designed to depend on the previous block to force a chronological order in the block chain. This makes it exponentially difficult to reverse previous transactions because this requires the recalculation of the proofs of work of all the subsequent blocks. When two blocks are found at the same time, miners work on the first block they receive and switch to the longest chain of blocks as soon as the next block is found. This allows mining to secure and maintain a global consensus based on processing power.</p><p>Bitcoin miners are neither able to cheat by increasing their own reward nor process fraudulent transactions that could corrupt the Bitcoin network because all Bitcoin nodes would reject any block that contains invalid data as per the rules of the Bitcoin protocol. Consequently, the network remains secure even if not all Bitcoin miners can be trusted.</p></div><p class="faq_question bold">Isn&rsquo;t Bitcoin mining a waste of energy?</p><div class="faq_answer"><p>Spending energy to secure and operate a payment system is hardly a waste. Like any other payment service, the use of Bitcoin entails processing costs. Services necessary for the operation of currently widespread monetary systems, such as banks, credit cards, and armored vehicles, also use a lot of energy. Although unlike Bitcoin, their total energy consumption is not transparent and cannot be as easily measured.</p><p>Bitcoin mining has been designed to become more optimized over time with specialized hardware consuming less energy, and the operating costs of mining should continue to be proportional to demand. When Bitcoin mining becomes too competitive and less profitable, some miners choose to stop their activities. Furthermore, all energy expended mining is eventually transformed into heat, and the most profitable miners will be those who have put this heat to good use. An optimally efficient mining network is one that isn&rsquo;t actually consuming any extra energy. While this is an ideal, the economics of mining are such that miners individually strive toward it.</p></div><p class="faq_question bold">How does mining help secure Bitcoin?</p><div class="faq_answer"><p>Mining creates the equivalent of a competitive lottery that makes it very difficult for anyone to consecutively add new blocks of transactions into the block chain. This protects the neutrality of the network by preventing any individual from gaining the power to block certain transactions. This also prevents any individual from replacing parts of the block chain to roll back their own spends, which could be used to defraud other users. Mining makes it exponentially more difficult to reverse a past transaction by requiring the rewriting of all blocks following this transaction.</p></div><p class="faq_question bold">What do I need to start mining?</p><div class="faq_answer"><p>In the early days of Bitcoin, anyone could find a new block using their computer&rsquo;s CPU. As more and more people started mining, the difficulty of finding new blocks increased greatly to the point where the only cost-effective method of mining today is using specialized hardware. You can visit BitcoinMining.com for more information.</p></div><p class="faq_question bold">Is Bitcoin secure?</p><div class="faq_answer"><p>The Bitcoin technology - the protocol and the cryptography - has a strong security track record, and the Bitcoin network is probably the biggest distributed computing project in the world. Bitcoin&rsquo;s most common vulnerability is in user error. Bitcoin wallet files that store the necessary private keys can be accidentally deleted, lost or stolen. This is pretty similar to physical cash stored in a digital form. Fortunately, users can employ sound security practices to protect their money or use service providers that offer good levels of security and insurance against theft or loss.</p></div><p class="faq_question bold">Hasn&rsquo;t Bitcoin been hacked in the past?</p><div class="faq_answer"><p>The rules of the protocol and the cryptography used for Bitcoin are still working years after its inception, which is a good indication that the concept is well designed. However, security flaws have been found and fixed over time in various software implementations. Like any other form of software, the security of Bitcoin software depends on the speed with which problems are found and fixed. The more such issues are discovered, the more Bitcoin is gaining maturity.</p><p>There are often misconceptions about thefts and security breaches that happened on diverse exchanges and businesses. Although these events are unfortunate, none of them involve Bitcoin itself being hacked, nor imply inherent flaws in Bitcoin; just like a bank robbery doesn&rsquo;t mean that the dollar is compromised. However, it is accurate to say that a complete set of good practices and intuitive security solutions is needed to give users better protection of their money, and to reduce the general risk of theft and loss. Over the course of the last few years, such security features have quickly developed, such as wallet encryption, offline wallets, hardware wallets, and multi-signature transactions.</p></div><p class="faq_question bold">Could users collude against Bitcoin?</p><div class="faq_answer"><p>It is not possible to change the Bitcoin protocol that easily. Any Bitcoin client that doesn&rsquo;t comply with the same rules cannot enforce their own rules on other users. As per the current specification, double spending is not possible on the same block chain, and neither is spending bitcoins without a valid signature. Therefore, It is not possible to generate uncontrolled amounts of bitcoins out of thin air, spend other users&rsquo; funds, corrupt the network, or anything similar.</p><p>However, powerful miners could arbitrarily choose to block or reverse recent transactions. A majority of users can also put pressure for some changes to be adopted. Because Bitcoin only works correctly with a complete consensus between all users, changing the protocol can be very difficult and requires an overwhelming majority of users to adopt the changes in such a way that remaining users have nearly no choice but to follow. As a general rule, it is hard to imagine why any Bitcoin user would choose to adopt any change that could compromise their own money.</p></div><p class="faq_question bold">Is Bitcoin vulnerable to quantum computing?</p><div class="faq_answer"><p>Yes, most systems relying on cryptography in general are, including traditional banking systems. However, quantum computers don&rsquo;t yet exist and probably won&rsquo;t for a while. In the event that quantum computing could be an imminent threat to Bitcoin, the protocol could be upgraded to use post-quantum algorithms. Given the importance that this update would have, it can be safely expected that it would be highly reviewed by developers and adopted by all Bitcoin users.</p></div><p class="faq_question bold">What if I have more questions about Bitcoin?</p><div class="faq_answer"><p>Three great places where you can get your questions answered are the BitcoinTalk Forum at <a href="http://bitcointalk.org" target="_blank">BitcoinTalk.org</a>, the Bitcoin sub-reddit at <a href="http://www.reddit.com/r/bitcoin" target="_blank">Reddit.com/r/bitcoin</a> and Bitcoin Stack Exchange at <a href="http://bitcoin.stackexchange.com/" target="_blank">Bitcoin.StackExchange.com</a>.</p></div>');
 }
 
 function insertIntoBetHistory(outcome, win_amount, lucky_number, server_seed, client_seed, sseed_hash, nonce, game_type, bet_on, jackpot, stake, multiplier, balance_before, balance_after, bonus_balance_before, bonus_balance_after, time) {
@@ -3180,7 +3229,7 @@ function insertIntoBetHistory(outcome, win_amount, lucky_number, server_seed, cl
     if (bet_on == "") {
         bet_on = "&nbsp;"
     }
-    if ($('div.multiply_bet_history_table_row').length == 20) {
+    if ($('div.multiply_bet_history_table_row').length >= 20) {
         $('div.multiply_bet_history_table_row').last().remove();
     }
     var date = formatDate();
@@ -3188,7 +3237,7 @@ function insertIntoBetHistory(outcome, win_amount, lucky_number, server_seed, cl
         date = time;
     }
     var split_date = date.split(" ");
-    var row_html = '<div class="multiply_bet_history_table_row"><div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-2 small-2 columns center lottery_winner_table_box lottery_winner_table_first_last_cell"><i class="show_balance_before_after fa fa-arrow-down" aria-hidden="true"></i>' + split_date[1] + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + game_type + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + bet_on + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + lucky_number + '</div><div class="large-2 small-2 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + stake + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + multiplier + '</div><div class="large-2 small-2 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + win_amount + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_third_cell">' + jackpot + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell"><a href="https://s3.amazonaws.com/roll-verifier/verify.html?server_seed=' + server_seed + '&client_seed=' + client_seed + '&server_seed_hash=' + sseed_hash + '&nonce=' + nonce + '" target=_blank>CLICK</a></div></div><div class="balance_before_after" class="large-12 small-12 columns center lottery_winner_table_box_container effect2" style="display: none;"><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell bb_background" style="font-weight: bold;">BB&nbsp; &nbsp;<i class="fa fa-info-circle" aria-hidden="true" title="Account Balance Before Bet"></i><span class="arrow-up balance_after_bet_span_1"></span><span class="arrow-up-small balance_after_bet_span_2"></span></div><div class="large-2 small-2 columns center lottery_winner_table_box balance_after_bet_column bb_background">' + balance_before + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell bb_background" style="font-weight: bold;">BA&nbsp; &nbsp;<i class="fa fa-info-circle" aria-hidden="true" title="Account Balance After Bet"></i><span class="arrow-up balance_after_bet_span_1"></span><span class="arrow-up-small balance_after_bet_span_2"></span></div><div class="large-2 small-2 columns center lottery_winner_table_box balance_after_bet_column bb_background">' + balance_after + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell bb_background" style="font-weight: bold;">BAB&nbsp;<i class="fa fa-info-circle" aria-hidden="true" title="Bonus Account Balance Before Bet"></i><span class="arrow-up balance_after_bet_span_1"></span><span class="arrow-up-small balance_after_bet_span_2"></span></div><div class="large-2 small-2 columns center lottery_winner_table_box balance_after_bet_column bb_background">' + bonus_balance_before + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell bb_background" style="font-weight: bold;">BAA&nbsp;<i class="fa fa-info-circle" aria-hidden="true" title="Bonus Account Balance After Bet"></i><span class="arrow-up balance_after_bet_span_1"></span><span class="arrow-up-small balance_after_bet_span_2"></span></div><div class="large-2 small-2 columns center lottery_winner_table_box balance_after_bet_last_column bb_background">' + bonus_balance_after + '</div></div></div>';
+    var row_html = '<div class="multiply_bet_history_table_row"><div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-2 small-2 columns center lottery_winner_table_box lottery_winner_table_first_last_cell"><i class="show_balance_before_after fa fa-arrows-alt" aria-hidden="true"></i>' + split_date[1] + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + game_type + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + bet_on + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + lucky_number + '</div><div class="large-2 small-2 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + stake + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + multiplier + '</div><div class="large-2 small-2 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + win_amount + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_third_cell">' + jackpot + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell"><a href="https://s3.amazonaws.com/roll-verifier/verify.html?server_seed=' + server_seed + '&client_seed=' + client_seed + '&server_seed_hash=' + sseed_hash + '&nonce=' + nonce + '" target=_blank>CLICK</a></div></div><div class="balance_before_after" class="large-12 small-12 columns center lottery_winner_table_box_container effect2" style="display: none;"><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell bb_background" style="font-weight: bold;">BB&nbsp; &nbsp;<i class="fa fa-info-circle" aria-hidden="true" title="Account Balance Before Bet"></i><span class="arrow-up balance_after_bet_span_1"></span><span class="arrow-up-small balance_after_bet_span_2"></span></div><div class="large-2 small-2 columns center lottery_winner_table_box balance_after_bet_column bb_background">' + balance_before + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell bb_background" style="font-weight: bold;">BA&nbsp; &nbsp;<i class="fa fa-info-circle" aria-hidden="true" title="Account Balance After Bet"></i><span class="arrow-up balance_after_bet_span_1"></span><span class="arrow-up-small balance_after_bet_span_2"></span></div><div class="large-2 small-2 columns center lottery_winner_table_box balance_after_bet_column bb_background">' + balance_after + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell bb_background" style="font-weight: bold;">BAB&nbsp;<i class="fa fa-info-circle" aria-hidden="true" title="Bonus Account Balance Before Bet"></i><span class="arrow-up balance_after_bet_span_1"></span><span class="arrow-up-small balance_after_bet_span_2"></span></div><div class="large-2 small-2 columns center lottery_winner_table_box balance_after_bet_column bb_background">' + bonus_balance_before + '</div><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell bb_background" style="font-weight: bold;">BAA&nbsp;<i class="fa fa-info-circle" aria-hidden="true" title="Bonus Account Balance After Bet"></i><span class="arrow-up balance_after_bet_span_1"></span><span class="arrow-up-small balance_after_bet_span_2"></span></div><div class="large-2 small-2 columns center lottery_winner_table_box balance_after_bet_last_column bb_background">' + bonus_balance_after + '</div></div></div>';
     var bet_history_date = split_date[0];
     var date_row_name = bet_history_date.replace(/\//g, '_');
     if ($('#multiply_history_date_row_' + date_row_name).length == 0) {
@@ -3198,20 +3247,6 @@ function insertIntoBetHistory(outcome, win_amount, lucky_number, server_seed, cl
         $('#multiply_history_date_row_' + date_row_name).next('div.multiply_history_table_header').after(row_html);
     }
     return false;
-}
-
-function GetRPPrizes() {
-    $.get('/cgi-bin/api.pl?op=get_rp_prizes', function(data) {
-        var mobile_class_one = "";
-        var mobile_class_two = "";
-        if (mobile_device == 1) {
-            mobile_class_one = " reward_link_redeem_button_mobile ";
-            mobile_class_two = " reward_link_redeem_button_mobile_last ";
-        }
-        for (var i = 0; i < data.length; i++) {
-            $("#" + data[i].category + "_rewards").append('<div class="effect2" style="margin: 0; border-radius: 3px; margin-top: 20px;"><div class="row reward_product_name">' + data[i].product_name + '</div><div class="row" style="margin:0; padding: 10px 0; border: 1px solid #bdbcb8; border-radius: 0 0 3px 3px; background:#fff;"><div class="large-3 small-12 columns"><div class="reward_link_redeem_button_style' + mobile_class_one + '" onclick="VisitLink(\x27' + data[i].product_link + '\x27)">LINK</div></div><div class="large-6 small-12 columns"><div class="reward_dollar_value_style' + mobile_class_one + '">' + data[i].points + ' RP</div></div><div class="large-3 small-12 columns"><button class="reward_link_redeem_button_style ' + mobile_class_two + '" onclick="RedeemRPProduct(\x27' + data[i].product_type + '\x27)">REDEEM</button></div></div></div>');
-        }
-    });
 }
 
 function VisitLink(url) {
@@ -3232,22 +3267,22 @@ function RedeemRPProduct(id) {
             if (result[1] == "s1") {
                 $('#balance').html(result[5]);
                 balanceChanged();
-                msg = "Successfully converted " + ReplaceNumberWithCommas(parseInt(0.04671937)) + " points to " + parseFloat(parseInt(result[4]) / 100000000).toFixed(8) + "BTC.";
+                msg = "Successfully converted " + ReplaceNumberWithCommas(parseInt(result[3])) + " points to " + parseFloat(parseInt(result[4]) / 100000000).toFixed(8) + "BTC.";
             } else if (result[1] == "s2") {
                 msg = "Your bonus has been succesfully activated!";
-                var inner_div_html = '<p>Active bonus <span class="free_play_bonus_box_span_large">' + result[5] + '</span> ends in <span class="free_play_bonus_box_span_large" id="bonus_span_' + 0.04671937 + '"></span></p>';
-                if ($("#bonus_container_" + 0.04671937).length > 0) {
-                    $("#bonus_container_" + 0.04671937).html(inner_div_html);
+                var inner_div_html = '<p>Active bonus <span class="free_play_bonus_box_span_large">' + result[5] + '</span> ends in <span class="free_play_bonus_box_span_large" id="bonus_span_' + result[3] + '"></span></p>';
+                if ($("#bonus_container_" + result[3]).length > 0) {
+                    $("#bonus_container_" + result[3]).html(inner_div_html);
                 } else {
-                    $('#reward_points_bonuses_main_div').append('<div class="bold center free_play_bonus_box_large" id="bonus_container_' + 0.04671937 + '">' + inner_div_html + '</div>');
+                    $('#reward_points_bonuses_main_div').append('<div class="bold center free_play_bonus_box_large" id="bonus_container_' + result[3] + '">' + inner_div_html + '</div>');
                 }
-                $("#bonus_container_" + 0.04671937).show();
-                BonusEndCountdown(0.04671937, parseInt(result[4]));
-                if (0.04671937 == "fp_bonus") {
-                    $('#fp_min_reward').html(0.04671937 + " BTC");
+                $("#bonus_container_" + result[3]).show();
+                BonusEndCountdown(result[3], parseInt(result[4]));
+                if (result[3] == "fp_bonus") {
+                    $('#fp_min_reward').html(result[6] + " BTC");
                 }
             } else if (result[1] == "s3") {
-                msg = "Your redemption request for " + 0.04671937 + " has been sent succesfully. We shall contact you via email for your shipping details (if required). If you do not have an email address added to your account, please add it now via the PROFILE page.";
+                msg = "Your redemption request for " + result[3] + " has been sent succesfully. We shall contact you via email for your shipping details (if required). If you do not have an email address added to your account, please add it now via the PROFILE page.";
             }
         } else if (result[0] == "e") {
             msg = result[1];
@@ -3359,30 +3394,314 @@ function Reset2FAQuestions(response) {
     }
 }
 
-function GenerateCaptchasNetCaptcha(parent_div, backup) {
-    parent_div = parent_div.replace(/\s/g, '');
-    $.get('/cgi-bin/api.pl?op=generate_captchasnet', function(data) {
-        if (data.length < 100) {
-            var image_url = "//captchas.freebitco.in/cgi-bin/captcha_generator?client=freebitcoin&random=" + data;
-            if (backup == 1) {
-                image_url = "//image.captchas.net/?client=freebitcoin&random=" + data;
+function GenerateCaptchasNetCaptcha(parent_div, type, rand) {
+    if (typeof rand !== "undefined" && rand.length > 5 && rand.length < 100) {
+        GenCaptchasNetCaptcha(parent_div, type, rand);
+    } else {
+        var fingerprint = $.fingerprint();
+        $.get('/cgi-bin/api.pl?op=generate_captchasnet&f=' + fingerprint, function(data) {
+            if (data.length < 100) {
+                GenCaptchasNetCaptcha(parent_div, type, data);
             }
-            $('#' + parent_div + ' .captchasnet_captcha_content').html('<img src="' + image_url + '" onerror="GenerateCaptchasNetCaptcha(\'' + parent_div + '\', 1);">');
-            $('#' + parent_div + ' .captchasnet_captcha_random').val(data);
-            $('#' + parent_div + ' .captchasnet_captcha_refresh').attr("onclick", "GenerateCaptchasNetCaptcha('" + parent_div + "', 0)");
-            $('#' + parent_div + ' .captchasnet_captcha_audio').attr("onclick", "PlayCaptchasNetAudioCaptcha('" + data + "')");
-            $('#' + parent_div + ' .captchasnet_captcha_input_box').val('');
-        }
-    });
+        });
+    }
+}
+
+function GenCaptchasNetCaptcha(parent_div, type, random_string) {
+    parent_div = parent_div.replace(/\s/g, '');
+    var image_url = "//captchas.freebitco.in/cgi-bin/captcha_generator?client=freebitcoin&random=" + random_string;
+    if (type == 2) {
+        image_url = "//captchas.freebitco.in/securimage/securimage/securimage_show.php?random=" + random_string;
+    } else if (type == 3) {
+        image_url = "//captchas.freebitco.in/botdetect/e/live/index.php?random=" + random_string;
+    }
+    $('#' + parent_div + ' .captchasnet_captcha_content').html('<img src="' + image_url + '" onerror="GenerateCaptchasNetCaptcha(\'' + parent_div + '\', ' + type + ', \'' + random_string + '\');">');
+    $('#' + parent_div + ' .captchasnet_captcha_random').val(random_string);
+    $('#' + parent_div + ' .captchasnet_captcha_refresh').attr("onclick", "GenerateCaptchasNetCaptcha('" + parent_div + "', " + type + ")");
+    $('#' + parent_div + ' .captchasnet_captcha_audio').attr("onclick", "PlayCaptchasNetAudioCaptcha('" + random_string + "')");
+    $('#' + parent_div + ' .captchasnet_captcha_input_box').val('');
 }
 
 function PlayCaptchasNetAudioCaptcha(captcha_random) {
     var audioElement = document.createElement('audio');
-    audioElement.setAttribute('src', '//audio.captchas.net/?client=freebitcoin&random=' + captcha_random);
+    audioElement.setAttribute('src', '//captchas.freebitco.in/cgi-bin/mp3/index.cgi?client=freebitcoin&random=' + captcha_random);
     audioElement.setAttribute('autoplay', 'autoplay');
     audioElement.addEventListener("load", function() {
         audioElement.play();
     }, true);
+}
+
+function SwitchCaptchas(type) {
+    var other_type = "recaptcha";
+    if (type == "recaptcha") {
+        other_type = "double_captchas";
+    }
+    $("#free_play_" + other_type).hide();
+    $("#free_play_" + type).show();
+    $("#signup_" + other_type).hide();
+    $("#signup_" + type).show();
+    $('#switch_captchas_button').attr("onclick", "SwitchCaptchas('" + other_type + "')");
+    $.cookie.raw = true;
+    $.cookie('default_captcha', type, {
+        expires: 3650,
+        secure: true
+    });
+}
+
+function UpdateStats() {
+    $.get('/stats_new_public/?f=updating', function(data) {
+        if (data.status == "success") {
+            if (data.total_btc_won_number > 0) {
+                $("#total_btc_won_number").html('<i class="fa fa-btc" aria-hidden="true"></i>&nbsp;' + ReplaceNumberWithCommas(parseFloat(data.total_btc_won_number * 100000000 / 100000000).toFixed(8)));
+                $("#total_btc_won_number_signup_page").html(ReplaceNumberWithCommas(parseFloat(data.total_btc_won_number * 100000000 / 100000000).toFixed(8)));
+            }
+            if (data.total_plays_number > 0) {
+                $("#total_plays_number").html(ReplaceNumberWithCommas(data.total_plays_number));
+            }
+            if (data.total_signups_number > 0) {
+                $("#total_signups_number").html(ReplaceNumberWithCommas(data.total_signups_number));
+            }
+            if (data.total_wagered_number > 0) {
+                $("#total_wagered_number").html('<i class="fa fa-btc" aria-hidden="true"></i>&nbsp;' + ReplaceNumberWithCommas(parseFloat(data.total_wagered_number * 100000000 / 100000000).toFixed(8)));
+            }
+            if (data.btc_price > 0) {
+                $("#btc_usd_price").html("$" + ReplaceNumberWithCommas(parseFloat(data.btc_price * 100 / 100).toFixed(2)));
+            }
+            if (data.current_lottery_round > 0) {
+                $(".current_lottery_round").html(ReplaceNumberWithCommas(parseInt(data.current_lottery_round)));
+            }
+            if (data.lottery_prize_amount >= 0) {
+                $(".lottery_first_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 512 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_second_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 256 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_third_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 128 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_fourth_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 64 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_fifth_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 32 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_sixth_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 16 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_seventh_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 8 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_eighth_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 4 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_ninth_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 2 * 0.000977517 / 100000000).toFixed(8)));
+                $(".lottery_tenth_prize").html(ReplaceNumberWithCommas(parseFloat(data.lottery_prize_amount * 1 * 0.000977517 / 100000000).toFixed(8)));
+            }
+            if (data.total_lottery_tickets >= 0) {
+                $("#total_lottery_tickets").html(ReplaceNumberWithCommas(data.total_lottery_tickets));
+                if (typeof $("#user_lottery_tickets").html() != "undefined") {
+                    var user_lottery_tickets = parseInt($("#user_lottery_tickets").html().replace(/\,/g, ''));
+                    if (user_lottery_tickets >= 0) {
+                        $("#lottery_win_chance").html(ReplaceNumberWithCommas(parseFloat(((1 - Math.pow(((data.total_lottery_tickets - user_lottery_tickets) / data.total_lottery_tickets), 10)) * 100) * 100000000 / 100000000).toFixed(8)));
+                    } else {
+                        $("#lottery_win_chance").html('0.00000000');
+                    }
+                }
+            }
+            if (data.lottery_seed_hash.length > 0) {
+                $("#lottery_seed_hash").val(data.lottery_seed_hash);
+            }
+            if (data.lottery_ticket_price > 0) {
+                $(".lottery_ticket_price").html(parseFloat(data.lottery_ticket_price / 100000000).toFixed(8));
+            }
+            if (data.lottery_round_end > 0) {
+                var lottery_timer_end = $('#lottery_round_end').countdown('option', 'until');
+                var d = new Date();
+                var curtime = parseInt(d.getTime() / 1000);
+                var lottery_end_time = curtime + parseInt(lottery_timer_end);
+                if (data.lottery_round_end - lottery_end_time > 29 || lottery_end_time - data.lottery_round_end > 29) {
+                    $('#lottery_round_end').countdown('destroy');
+                    $('#lottery_round_end').countdown({
+                        until: '+' + parseInt(data.lottery_round_end) - curtime,
+                        format: 'DHMS'
+                    });
+                }
+            }
+            if (data.lottery_wager.length > 0) {
+                $(".lottery_wager").html(data.lottery_wager);
+            }
+            if (data.wager_contest.wager.length > 0) {
+                PrintWagerContestTables("wager_promotion_wager_contest", data.wager_contest.wager, "wager");
+            }
+            if (data.wager_contest.ref_contest.length > 0) {
+                PrintWagerContestTables("wager_promotion_ref_contest", data.wager_contest.ref_contest, "ref");
+            }
+            if (parseInt(data.wager_contest.contest_end) > 0) {
+                var wager_contest_end = parseInt(data.wager_contest.contest_end);
+                var wager_timer_end = $('#wager_contest_end').countdown('option', 'until');
+                var d = new Date();
+                var curtime = parseInt(d.getTime() / 1000);
+                var wager_end_time = curtime + parseInt(wager_timer_end);
+                if (wager_contest_end - wager_end_time > 29 || wager_end_time - wager_contest_end > 29) {
+                    $('#wager_contest_end').countdown('destroy');
+                    $('#wager_contest_end').countdown({
+                        until: '+' + parseInt(wager_contest_end) - curtime,
+                        format: 'DHMS'
+                    });
+                }
+            }
+        }
+    });
+    setTimeout(UpdateStats, 30000);
+}
+
+function PrintWagerContestTables(parent, info, type) {
+    var mobile_class = "";
+    if (mobile_device == 1) {
+        mobile_class = "lottery_table_mobile_style";
+    }
+    var wager_contest_prizes = [10000, 5000, 2500, 1250, 625, 300, 150, 75, 40, 20];
+    var ref_contest_prizes = [5000, 2500, 1250, 625, 300, 150, 75, 40, 20, 10];
+    var text_to_print = "";
+    for (var i = 0; i < info.length; i++) {
+        var special_class = "wager_rank_7_8_9_10";
+        if (i == 0) {
+            special_class = "wager_rank_1";
+        } else if (i == 1 || i == 2) {
+            special_class = "wager_rank_2_3";
+        } else if (i == 3 || i == 4 || i == 5) {
+            special_class = "wager_rank_4_5_6";
+        }
+        var prize = wager_contest_prizes[i];
+        var wagered = parseFloat(info[i].wagered / 100000000).toFixed(8);
+        if (type == "ref") {
+            prize = ref_contest_prizes[i];
+        }
+        var rank = i + 1;
+        text_to_print = text_to_print + '<div class="large-12 small-12 columns center ' + special_class + '_container"><div class="large-1 small-1 columns center wager_table_cell ' + special_class + ' lottery_winner_table_first_last_cell ' + mobile_class + '"><p class="wager_rank">' + rank + '</p></div><div class="large-11 small-11 columns"><div class="row"><div class="large-3 small-3 columns center wager_table_cell ' + special_class + ' lottery_winner_table_second_cell ' + mobile_class + '">' + info[i].userid + '</div> <div class="large-5 small-5 columns center wager_table_cell ' + special_class + ' lottery_winner_table_second_cell ' + mobile_class + '"><i class="fa fa-btc" aria-hidden="true"></i>&nbsp;<span>' + ReplaceNumberWithCommas(wagered) + '</span></div><div class="large-4 small-4 columns center wager_table_cell ' + special_class + ' lottery_winner_table_third_cell ' + mobile_class + '" style="border-right: none;">$&nbsp;<span>' + ReplaceNumberWithCommas(prize) + '</span></div></div></div></div>';
+    }
+    $("#" + parent).html(text_to_print);
+}
+
+function InitialUserStats() {
+    $.get('/stats_new_private/?u=' + socket_userid + '&p=' + socket_password + '&f=user_stats_initial', function(data) {
+        if (data.status == "success") {
+            GenerateStatsTables('PAYMENTS SENT (LAST 30 DAYS, MAX. 25)', 'TIME', 'ADDRESS', 'AMOUNT', 'TRANSACTION', data.payments_sent, 'personal_stats_page_tables');
+            GenerateStatsTables('DEPOSITS (LAST 25)', 'TIME', 'ADDRESS', 'AMOUNT', 'TRANSACTION', data.deposits, 'personal_stats_page_tables');
+            for (property in data.user) {
+                if (property == "free_spins_played" || property == "paid_spins_played") {
+                    $("#user_" + property).html((ReplaceNumberWithCommas(parseInt(data.user[property]))));
+                } else {
+                    $("#user_" + property).html((ReplaceNumberWithCommas(parseFloat(data.user[property] / 100000000).toFixed(8))));
+                }
+            }
+        }
+    });
+}
+
+function InitialStatsLoad() {
+    $.get('/stats_new_public/?f=public_stats_initial', function(data) {
+        if (data.status == "success") {
+            google.setOnLoadCallback(drawChart("btc_won", "BTC"));
+            google.setOnLoadCallback(drawChart("wagered", "BTC"));
+            google.setOnLoadCallback(drawChart("total_plays", "Plays"));
+            google.setOnLoadCallback(drawChart("total_signups", "Signups"));
+            google.setOnLoadCallback(drawChart("referral_commissions", "BTC"));
+            google.setOnLoadCallback(drawChart("total_user_savings", "BTC"));
+            google.setOnLoadCallback(drawChart("total_interest_paid", "BTC"));
+
+            function drawChart(variable, col_name) {
+                if ($('#' + variable + '_div').length) {
+                    var chart_height = 300;
+                    var chart_width = 600;
+                    if (mobile_device == 1) {
+                        chart_height = 250;
+                        chart_width = 300;
+                    }
+                    var chart_arr = [
+                        ['Date', col_name]
+                    ];
+                    for (var i = 0; i < data[variable].length; i++) {
+                        chart_arr.push([data[variable][i].date, parseFloat(data[variable][i][variable])]);
+                    }
+                    var data2 = google.visualization.arrayToDataTable(chart_arr);
+                    var options = {
+                        pointSize: 8,
+                        width: chart_width,
+                        height: chart_height
+                    };
+                    var chart = new google.visualization.AreaChart(document.getElementById(variable + '_div'));
+                    chart.draw(data2, options);
+                }
+            }
+            var mobile_class_one = "";
+            var mobile_class_two = "";
+            if (mobile_device == 1) {
+                mobile_class_one = " reward_link_redeem_button_mobile ";
+                mobile_class_two = " reward_link_redeem_button_mobile_last ";
+            }
+            for (var i = 0; i < data.rp_prizes.length; i++) {
+                $("#" + data.rp_prizes[i].category + "_rewards").append('<div class="effect2" style="margin: 0; border-radius: 3px; margin-top: 20px;"><div class="row reward_product_name">' + data.rp_prizes[i].product_name + '</div><div class="row" style="margin:0; padding: 10px 0; border: 1px solid #bdbcb8; border-radius: 0 0 3px 3px; background:#fff;"><div class="large-3 small-12 columns"><div class="reward_link_redeem_button_style' + mobile_class_one + '" onclick="VisitLink(\x27' + data.rp_prizes[i].product_link + '\x27)">LINK</div></div><div class="large-6 small-12 columns"><div class="reward_dollar_value_style' + mobile_class_one + '">' + data.rp_prizes[i].points + ' RP</div></div><div class="large-3 small-12 columns"><button class="reward_link_redeem_button_style ' + mobile_class_two + '" onclick="RedeemRPProduct(\x27' + data.rp_prizes[i].product_type + '\x27)">REDEEM</button></div></div></div>');
+            }
+            GenerateStatsTables('TOP 10 JACKPOT WINNERS', 'ADDRESS', 'JACKPOT AMOUNT', 'FREE ROLLS', 'MULTIPLY ROLLS', data.jackpot_winners, 'stats_page_tables');
+            GenerateStatsTables('TOP 10 OVERALL WINNERS', 'ADDRESS', 'TOTAL WON', 'FREE ROLLS', 'MULTIPLY ROLLS', data.top_10_winners, 'stats_page_tables');
+            GenerateStatsTables('TOP 10 AFFILIATES', 'ADDRESS', 'COMMISSIONS', 'REFERRED', 'SHARED', data.top_referrers, 'stats_page_tables');
+            GenerateStatsTables('LAST 10 PAYMENTS SENT', 'DATE', 'TYPE', 'AMOUNT', 'TX', data.sent_payments, 'stats_page_tables');
+        }
+    });
+}
+
+function GenerateStatsTables(title, cname1, cname2, cname3, cname4, data_obj, pop_div) {
+    var content = '<div class="row" style="margin-top:20px;margin-bottom: 20px;"><div class="large-9 small-12 large-centered small-centered columns"><div class="large-12 small-12 columns center lottery_winner_table_box table_header_background br_5_5" style="padding: 15px 0;">' + title + '</div>';
+    if (mobile_device == 1) {
+        for (var i = 0; i < data_obj.length; i++) {
+            content = content + '<div class="new_stats_table_for_small"><div class="large-12 small-12 columns center lottery_winner_table_box_container effect2 multiply_history_table_header"><div class="large-3 small-6 columns center lottery_winner_table_box lottery_winner_table_first_last_cell font_bold">' + cname1 + '</div><div class="large-3 small-6 columns center lottery_winner_table_box lottery_winner_table_second_cell font_bold">' + cname2 + '</div><div class="large-3 small-6 columns center lottery_winner_table_box lottery_winner_table_first_last_cell">' + data_obj[i].c1 + '</div> <div class="large-3 small-6 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + data_obj[i].c2 + '</div></div><div style="margin-bottom: 10px;"><div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-3 small-6 columns center lottery_winner_table_box lottery_winner_table_third_cell font_bold" style="border-left: 1px solid #ccc;">' + cname3 + '</div><div class="large-3 small-6 columns center lottery_winner_table_box lottery_winner_table_first_last_cell font_bold">' + cname4 + '</div><div class="large-3 small-6 columns center lottery_winner_table_box lottery_winner_table_third_cell" style="border-left: 1px solid #ccc;">' + data_obj[i].c3 + '</div><div class="large-3 small-6 columns center lottery_winner_table_box lottery_winner_table_first_last_cell">' + data_obj[i].c4 + '</div></div></div><div class="large-12 small-12 columns center" style="height:5px;"></div></div>';
+        }
+    } else {
+        content = content + '<div class="new_stats_table_for_big"><div class="large-12 small-12 columns center lottery_winner_table_box_container effect2 multiply_history_table_header"><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_first_last_cell font_bold">' + cname1 + '</div><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_second_cell font_bold">' + cname2 + '</div><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_third_cell font_bold"><span>' + cname3 + '</span></div><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_first_last_cell font_bold"><span>' + cname4 + '</span></div></div>';
+        for (var i = 0; i < data_obj.length; i++) {
+            content = content + '<div><div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_first_last_cell">' + data_obj[i].c1 + '</div><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_second_cell">' + data_obj[i].c2 + '</div><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_third_cell">' + data_obj[i].c3 + '</div><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_first_last_cell">' + data_obj[i].c4 + '</div></div></div>';
+        }
+        content = content + '</div>';
+    }
+    content = content + '</div></div>';
+    $("#" + pop_div).append(content);
+}
+
+function InsertAlertMsg(type, content, expires) {
+    var expiry = 3650;
+    if (expires > 0) {
+        expiry = expires;
+    }
+    if ($.cookie("hide_" + type + "_msg") != 1) {
+        var to_pub = '<div class="alert-box" id="' + type + '_msg" style="background-color:#FFFFAD;color:black;" align=center>' + content + '<a href="javascript:void(0);" class="close" onclick="CloseAlertMsg(\x27' + type + '\x27,' + expiry + ');">&times;</a></div>';
+        $("#changing_rewards_link").after(to_pub);
+    }
+}
+
+function PreviousContestWinners(round_number) {
+    if (round_number > 0) {
+        $.get('/stats_new_public/?f=wager_contest_winners&cbreak=2&round=' + round_number, function(data) {
+            if (data.status == "success") {
+                $(".prev_contest_round_title").html('CONTEST ROUND ' + round_number + ' WINNERS');
+                $("#contest_winner_table_user_list").html('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="font_bold large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell gold <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> # </div><div class="font_bold large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_second_cell gold <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> USERID </div><div class="font_bold large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_third_cell gold <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> AMOUNT WON </div><div class="font_bold large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell gold <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> WAGERED </div></div>');
+                $("#contest_winner_table_referrer_list").html('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="font_bold large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell gold <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> # </div><div class="font_bold large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_second_cell gold <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> USERID </div><div class="font_bold large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_third_cell gold <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> AMOUNT WON </div><div class="font_bold large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell gold <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> REF. WAGERED </div></div>');
+                for (var x = 1; x < 11; x++) {
+                    for (var i = 0; i < data.contest_winners.length; i++) {
+                        if (parseInt(data.contest_winners[i].rank) == x) {
+                            if (data.contest_winners[i].contest_type == "wager") {
+                                var prize = parseFloat(Math.round((data.contest_winners[i].prize / 100000000) * 100000000) / 100000000).toFixed(8);
+                                var wagered = parseFloat(Math.round((data.contest_winners[i].wagered / 100000000) * 100000000) / 100000000).toFixed(8);
+                                $("#contest_winner_table_user_list").append('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> ' + data.contest_winners[i].rank + ' </div><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_second_cell <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> ' + data.contest_winners[i].userid + ' </div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_third_cell <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> <i class="fa fa-btc" aria-hidden="true"></i> ' + prize + '</div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> <i class="fa fa-btc" aria-hidden="true"></i> ' + wagered + ' </div></div>')
+                            } else if (data.contest_winners[i].contest_type == "ref") {
+                                var prize = parseFloat(Math.round((data.contest_winners[i].prize / 100000000) * 100000000) / 100000000).toFixed(8);
+                                var wagered = parseFloat(Math.round((data.contest_winners[i].wagered / 100000000) * 100000000) / 100000000).toFixed(8);
+                                $("#contest_winner_table_referrer_list").append('<div class="large-12 small-12 columns center lottery_winner_table_box_container effect2"><div class="large-1 small-1 columns center lottery_winner_table_box lottery_winner_table_first_last_cell <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> ' + data.contest_winners[i].rank + ' </div><div class="large-3 small-3 columns center lottery_winner_table_box lottery_winner_table_second_cell <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> ' + data.contest_winners[i].userid + ' </div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_third_cell <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> <i class="fa fa-btc" aria-hidden="true"></i> ' + prize + '</div><div class="large-4 small-4 columns center lottery_winner_table_box lottery_winner_table_first_last_cell <TMPL_IF mobile>lottery_table_mobile_style</TMPL_IF>"> <i class="fa fa-btc" aria-hidden="true"></i> ' + wagered + ' </div></div>');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function CloseAlertMsg(type, expires) {
+    var expiry = 3650;
+    if (expires > 0) {
+        expiry = expires;
+    }
+    $("#" + type + "_msg").hide();
+    $.cookie.raw = true;
+    $.cookie("hide_" + type + "_msg", 1, {
+        expires: expiry,
+        secure: true
+    });
 }
 $.urlParam = function(name) {
     var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
