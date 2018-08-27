@@ -12,10 +12,10 @@ var bonus_table_closed = 0;
 var hide_pending_payments = 0;
 var hide_pending_deposits = 0;
 var profile_withdraw_address = "";
+var r;
 var withdraw_max_amount = 0;
 eval("var " + window[tcGiQefA] + " = ''");
 var balance_last_changed = 0;
-var r;
 $.ajaxSetup({
     data: {
         csrf_token: $.cookie('csrf_token')
